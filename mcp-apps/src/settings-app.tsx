@@ -1,5 +1,6 @@
 /**
  * OpenRAG Settings MCP App - reuses frontend shadcn/ui components.
+ * Uses native <select> for provider/model dropdowns so they work in MCP host iframes.
  */
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { StrictMode, useCallback, useEffect, useState } from "react";
@@ -16,15 +17,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 import "../globals.css";
+
+const LLM_PROVIDERS = ["openai", "anthropic", "ollama", "watsonx"] as const;
+const EMBEDDING_PROVIDERS = ["openai", "ollama", "watsonx"] as const;
+
+/** Get tool result text from either content[] or structuredContent.result[] (host-dependent). */
+function getToolResultText(
+  result: {
+    content?: Array<{ type: string; text?: string }>;
+    structuredContent?: { result?: Array<{ type: string; text?: string }> };
+  }
+): string | undefined {
+  const fromContent = result.content?.find((c) => c.type === "text")?.text;
+  if (fromContent) return fromContent;
+  return result.structuredContent?.result?.find((c) => c.type === "text")?.text;
+}
+
+interface ModelOption {
+  value: string;
+  label?: string;
+  default?: boolean;
+}
 
 const MAX_SYSTEM_PROMPT_CHARS = 4000;
 
@@ -66,13 +81,17 @@ function SettingsApp() {
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [llmModels, setLlmModels] = useState<ModelOption[]>([]);
+  const [embeddingModels, setEmbeddingModels] = useState<ModelOption[]>([]);
+  const [loadingLlmModels, setLoadingLlmModels] = useState(false);
+  const [loadingEmbeddingModels, setLoadingEmbeddingModels] = useState(false);
 
   const { app, error: appError } = useApp({
     appInfo: { name: "OpenRAG Settings", version: "1.0.0" },
     capabilities: {},
     onAppCreated: (app) => {
       app.ontoolresult = async (result) => {
-        const textContent = result.content?.find((c) => c.type === "text")?.text;
+        const textContent = getToolResultText(result);
         if (!textContent) return;
         try {
           const data = JSON.parse(textContent);
@@ -95,7 +114,7 @@ function SettingsApp() {
         name: "openrag_get_settings",
         arguments: {},
       });
-      const textContent = result.content?.find((c) => c.type === "text")?.text;
+      const textContent = getToolResultText(result);
       if (textContent) {
         const data = JSON.parse(textContent);
         if (data.agent) setAgent((prev) => ({ ...prev, ...data.agent }));
@@ -128,7 +147,7 @@ function SettingsApp() {
           picture_descriptions: knowledge.picture_descriptions,
         },
       });
-      const textContent = result.content?.find((c) => c.type === "text")?.text;
+      const textContent = getToolResultText(result);
       if (textContent) {
         const data = JSON.parse(textContent);
         if (data.error) setError(data.error);
@@ -140,9 +159,95 @@ function SettingsApp() {
     }
   }, [app, agent, knowledge]);
 
+  function getLlmModelPlaceholder(): string {
+    if (loadingLlmModels) return "Loading models...";
+    if (agent.llm_provider) return "No models or configure provider in OpenRAG Settings";
+    return "Select provider first";
+  }
+
+  function getEmbeddingModelPlaceholder(): string {
+    if (loadingEmbeddingModels) return "Loading models...";
+    if (knowledge.embedding_provider) return "No models or configure provider in OpenRAG Settings";
+    return "Select provider first";
+  }
+
+  const loadLlmModels = useCallback(
+    async (provider: string) => {
+      if (!app || !provider) {
+        setLlmModels([]);
+        return;
+      }
+      setLoadingLlmModels(true);
+      try {
+        const result = await app.callServerTool({
+          name: "openrag_list_models",
+          arguments: { provider },
+        });
+        const textContent = getToolResultText(result);
+        if (textContent) {
+          const parsed = JSON.parse(textContent);
+          if (!parsed.error && parsed.language_models) {
+            setLlmModels(parsed.language_models);
+          } else {
+            setLlmModels([]);
+          }
+        } else {
+          setLlmModels([]);
+        }
+      } catch {
+        setLlmModels([]);
+      } finally {
+        setLoadingLlmModels(false);
+      }
+    },
+    [app]
+  );
+
+  const loadEmbeddingModels = useCallback(
+    async (provider: string) => {
+      if (!app || !provider) {
+        setEmbeddingModels([]);
+        return;
+      }
+      setLoadingEmbeddingModels(true);
+      try {
+        const result = await app.callServerTool({
+          name: "openrag_list_models",
+          arguments: { provider },
+        });
+        const textContent = getToolResultText(result);
+        if (textContent) {
+          const parsed = JSON.parse(textContent);
+          if (!parsed.error && parsed.embedding_models) {
+            setEmbeddingModels(parsed.embedding_models);
+          } else {
+            setEmbeddingModels([]);
+          }
+        } else {
+          setEmbeddingModels([]);
+        }
+      } catch {
+        setEmbeddingModels([]);
+      } finally {
+        setLoadingEmbeddingModels(false);
+      }
+    },
+    [app]
+  );
+
   useEffect(() => {
     if (app) refresh();
   }, [app]);
+
+  useEffect(() => {
+    if (app && agent.llm_provider) loadLlmModels(agent.llm_provider);
+    else setLlmModels([]);
+  }, [app, agent.llm_provider, loadLlmModels]);
+
+  useEffect(() => {
+    if (app && knowledge.embedding_provider) loadEmbeddingModels(knowledge.embedding_provider);
+    else setEmbeddingModels([]);
+  }, [app, knowledge.embedding_provider, loadEmbeddingModels]);
 
   if (appError) return <div className="text-destructive p-4">Error: {appError.message}</div>;
   if (!app) return <div className="p-4 text-muted-foreground">Connecting...</div>;
@@ -167,38 +272,60 @@ function SettingsApp() {
         <CardHeader>
           <CardTitle className="text-lg">Agent</CardTitle>
           <CardDescription>
-            This Agent retrieves from your knowledge and generates chat responses.
+            Language model used for chat. Configure the provider in OpenRAG Settings (API keys) first.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Language model</Label>
-            <div className="flex gap-2">
-              <Select
-                value={agent.llm_provider}
-                onValueChange={(v) => setAgent((a) => ({ ...a, llm_provider: v }))}
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                  <SelectItem value="ollama">Ollama</SelectItem>
-                  <SelectItem value="watsonx">WatsonX</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                className="flex-1"
-                value={agent.llm_model}
-                onChange={(e) => setAgent((a) => ({ ...a, llm_model: e.target.value }))}
-                placeholder="Model name"
-              />
-            </div>
+            <Label htmlFor="llm-provider">Language model provider</Label>
+            <select
+              id="llm-provider"
+              value={agent.llm_provider}
+              onChange={(e) =>
+                setAgent((a) => ({ ...a, llm_provider: e.target.value, llm_model: "" }))
+              }
+              className="flex h-9 w-[180px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="">Select provider</option>
+              {LLM_PROVIDERS.map((p) => (
+                <option key={p} value={p}>
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="space-y-2">
-            <Label>Agent instructions</Label>
+            <Label htmlFor="llm-model">Language model</Label>
+            {llmModels.length > 0 ? (
+              <select
+                id="llm-model"
+                value={agent.llm_model}
+                onChange={(e) => setAgent((a) => ({ ...a, llm_model: e.target.value }))}
+                className="flex h-9 w-full max-w-md rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">Select model</option>
+                {llmModels.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label || m.value}
+                    {m.default ? " (default)" : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                id="llm-model"
+                className="max-w-md"
+                value={agent.llm_model}
+                onChange={(e) => setAgent((a) => ({ ...a, llm_model: e.target.value }))}
+                placeholder={getLlmModelPlaceholder()}
+                disabled={!agent.llm_provider}
+              />
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="system-prompt">Agent instructions</Label>
             <Textarea
+              id="system-prompt"
               value={agent.system_prompt}
               onChange={(e) => setAgent((a) => ({ ...a, system_prompt: e.target.value }))}
               placeholder="Enter your agent instructions here..."
@@ -216,37 +343,63 @@ function SettingsApp() {
         <CardHeader>
           <CardTitle className="text-lg">Knowledge ingest</CardTitle>
           <CardDescription>
-            Configure how files are ingested and stored for retrieval.
+            Configure how files are ingested and stored. Set provider in OpenRAG Settings first.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Embedding model</Label>
-            <div className="flex gap-2">
-              <Select
-                value={knowledge.embedding_provider}
-                onValueChange={(v) =>
-                  setKnowledge((k) => ({ ...k, embedding_provider: v }))
-                }
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="ollama">Ollama</SelectItem>
-                  <SelectItem value="watsonx">WatsonX</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                className="flex-1"
+            <Label htmlFor="emb-provider">Embedding provider</Label>
+            <select
+              id="emb-provider"
+              value={knowledge.embedding_provider}
+              onChange={(e) =>
+                setKnowledge((k) => ({
+                  ...k,
+                  embedding_provider: e.target.value,
+                  embedding_model: "",
+                }))
+              }
+              className="flex h-9 w-[180px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="">Select provider</option>
+              {EMBEDDING_PROVIDERS.map((p) => (
+                <option key={p} value={p}>
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="emb-model">Embedding model</Label>
+            {embeddingModels.length > 0 ? (
+              <select
+                id="emb-model"
                 value={knowledge.embedding_model}
                 onChange={(e) =>
                   setKnowledge((k) => ({ ...k, embedding_model: e.target.value }))
                 }
-                placeholder="Model name"
+                className="flex h-9 w-full max-w-md rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">Select model</option>
+                {embeddingModels.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label || m.value}
+                    {m.default ? " (default)" : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                id="emb-model"
+                className="max-w-md"
+                value={knowledge.embedding_model}
+                onChange={(e) =>
+                  setKnowledge((k) => ({ ...k, embedding_model: e.target.value }))
+                }
+                placeholder={getEmbeddingModelPlaceholder()}
+                disabled={!knowledge.embedding_provider}
               />
-            </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

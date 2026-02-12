@@ -1,5 +1,6 @@
 /**
  * OpenRAG Models MCP App - list and select LLM/embedding models per provider.
+ * Uses native <select> for dropdowns so they work in MCP host iframes (no Radix portal).
  */
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { StrictMode, useCallback, useEffect, useState } from "react";
@@ -12,19 +13,23 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 import "../globals.css";
 
 const PROVIDERS = ["openai", "anthropic", "ollama", "watsonx"] as const;
+
+/** Get tool result text from either content[] or structuredContent.result[] (host-dependent). */
+function getToolResultText(
+  result: {
+    content?: Array<{ type: string; text?: string }>;
+    structuredContent?: { result?: Array<{ type: string; text?: string }> };
+  }
+): string | undefined {
+  const fromContent = result.content?.find((c) => c.type === "text")?.text;
+  if (fromContent) return fromContent;
+  return result.structuredContent?.result?.find((c) => c.type === "text")?.text;
+}
 
 interface ModelOption {
   value: string;
@@ -50,7 +55,7 @@ function ModelsApp() {
     capabilities: {},
     onAppCreated: (app) => {
       app.ontoolresult = async (result) => {
-        const textContent = result.content?.find((c) => c.type === "text")?.text;
+        const textContent = getToolResultText(result);
         if (!textContent) return;
         try {
           const parsed = JSON.parse(textContent);
@@ -79,7 +84,7 @@ function ModelsApp() {
           name: "openrag_list_models",
           arguments: { provider: prov },
         });
-        const textContent = result.content?.find((c) => c.type === "text")?.text;
+        const textContent = getToolResultText(result);
         if (textContent) {
           const parsed = JSON.parse(textContent);
           if (parsed.error) setError(parsed.error);
@@ -100,27 +105,32 @@ function ModelsApp() {
 
   const applyLlm = useCallback(async () => {
     if (!app || !selectedLlm) return;
+    setError(null);
     try {
       await app.callServerTool({
         name: "openrag_update_settings",
-        arguments: { llm_model: selectedLlm },
+        arguments: { llm_provider: provider, llm_model: selectedLlm },
       });
     } catch (e) {
       setError(String(e));
     }
-  }, [app, selectedLlm]);
+  }, [app, provider, selectedLlm]);
 
   const applyEmbedding = useCallback(async () => {
     if (!app || !selectedEmbedding) return;
+    setError(null);
     try {
       await app.callServerTool({
         name: "openrag_update_settings",
-        arguments: { embedding_model: selectedEmbedding },
+        arguments: {
+          embedding_provider: provider,
+          embedding_model: selectedEmbedding,
+        },
       });
     } catch (e) {
       setError(String(e));
     }
-  }, [app, selectedEmbedding]);
+  }, [app, provider, selectedEmbedding]);
 
   if (appError) return <div className="text-destructive p-4">Error: {appError.message}</div>;
   if (!app) return <div className="p-4 text-muted-foreground">Connecting...</div>;
@@ -154,29 +164,27 @@ function ModelsApp() {
         <>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Language models</CardTitle>
-              <CardDescription>Select the LLM for chat.</CardDescription>
+              <CardTitle className="text-base">Language model</CardTitle>
+              <CardDescription>Model used for chat. Apply to save.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Select value={selectedLlm} onValueChange={setSelectedLlm}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select language model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(data.language_models || []).map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      <span className="flex items-center gap-2">
-                        {m.label || m.value}
-                        {m.default && (
-                          <Badge variant="secondary" className="text-xs">
-                            default
-                          </Badge>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="llm-select" className="sr-only">
+                Select language model
+              </Label>
+              <select
+                id="llm-select"
+                value={selectedLlm}
+                onChange={(e) => setSelectedLlm(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">Select language model</option>
+                {(data.language_models || []).map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label || m.value}
+                    {m.default ? " (default)" : ""}
+                  </option>
+                ))}
+              </select>
               <Button size="sm" variant="outline" onClick={applyLlm} disabled={!selectedLlm}>
                 Apply as LLM
               </Button>
@@ -185,29 +193,29 @@ function ModelsApp() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Embedding models</CardTitle>
-              <CardDescription>Select the embedding model for knowledge ingest.</CardDescription>
+              <CardTitle className="text-base">Embedding model</CardTitle>
+              <CardDescription>
+                Model used for knowledge ingest. Apply to save.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Select value={selectedEmbedding} onValueChange={setSelectedEmbedding}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select embedding model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(data.embedding_models || []).map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      <span className="flex items-center gap-2">
-                        {m.label || m.value}
-                        {m.default && (
-                          <Badge variant="secondary" className="text-xs">
-                            default
-                          </Badge>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="emb-select" className="sr-only">
+                Select embedding model
+              </Label>
+              <select
+                id="emb-select"
+                value={selectedEmbedding}
+                onChange={(e) => setSelectedEmbedding(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">Select embedding model</option>
+                {(data.embedding_models || []).map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label || m.value}
+                    {m.default ? " (default)" : ""}
+                  </option>
+                ))}
+              </select>
               <Button
                 size="sm"
                 variant="outline"

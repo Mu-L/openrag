@@ -7,7 +7,7 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.resources.types import FunctionResource
-from mcp.types import TextContent
+from mcp.types import CallToolResult, TextContent
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -65,7 +65,7 @@ def create_mcp_http_app(services: dict):
         ),
         meta={"ui": {"resourceUri": SETTINGS_VIEW_URI}},
     )
-    async def openrag_get_settings() -> list[TextContent]:
+    async def openrag_get_settings() -> CallToolResult:
         from config.settings import get_openrag_config
 
         config = get_openrag_config()
@@ -85,7 +85,11 @@ def create_mcp_http_app(services: dict):
                 "picture_descriptions": config.knowledge.picture_descriptions,
             },
         }
-        return [TextContent(type="text", text=json.dumps(data))]
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps(data))],
+            structuredContent=None,
+            isError=False,
+        )
 
     @mcp.tool(
         name="openrag_update_settings",
@@ -107,7 +111,7 @@ def create_mcp_http_app(services: dict):
         table_structure: bool | None = None,
         ocr: bool | None = None,
         picture_descriptions: bool | None = None,
-    ) -> list[TextContent]:
+    ) -> CallToolResult:
         from api.settings import update_settings
 
         body = {}
@@ -133,7 +137,11 @@ def create_mcp_http_app(services: dict):
             body["picture_descriptions"] = picture_descriptions
 
         if not body:
-            return [TextContent(type="text", text=json.dumps({"error": "No settings to update. Provide at least one option."}))]
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps({"error": "No settings to update. Provide at least one option."}))],
+                structuredContent=None,
+                isError=False,
+            )
 
         # Build a minimal request so update_settings can run
         body_bytes = json.dumps(body).encode("utf-8")
@@ -155,7 +163,11 @@ def create_mcp_http_app(services: dict):
         request = Request(scope, receive, lambda _: None)
         response = await update_settings(request, session_manager)
         content = response.body.decode("utf-8")
-        return [TextContent(type="text", text=content)]
+        return CallToolResult(
+            content=[TextContent(type="text", text=content)],
+            structuredContent=None,
+            isError=False,
+        )
 
     @mcp.tool(
         name="openrag_list_models",
@@ -166,31 +178,47 @@ def create_mcp_http_app(services: dict):
         ),
         meta={"ui": {"resourceUri": MODELS_VIEW_URI}},
     )
-    async def openrag_list_models(provider: str) -> list[TextContent]:
+    async def openrag_list_models(provider: str) -> CallToolResult:
         from config.settings import get_openrag_config
         from api.v1.models import _fetch_models, VALID_PROVIDERS
 
         provider = (provider or "").lower()
         if provider not in VALID_PROVIDERS:
-            return [
-                TextContent(
-                    type="text",
-                    text=json.dumps(
-                        {"error": f"Invalid provider. Must be one of: {', '.join(sorted(VALID_PROVIDERS))}"}
-                    ),
-                )
-            ]
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(
+                            {"error": f"Invalid provider. Must be one of: {', '.join(sorted(VALID_PROVIDERS))}"}
+                        ),
+                    )
+                ],
+                structuredContent=None,
+                isError=False,
+            )
         try:
             config = get_openrag_config()
             models, error_response = await _fetch_models(provider, config, models_service)
             if error_response is not None:
                 body = error_response.body
-                return [TextContent(type="text", text=body.decode("utf-8"))]
-            return [TextContent(type="text", text=json.dumps(models))]
+                return CallToolResult(
+                    content=[TextContent(type="text", text=body.decode("utf-8"))],
+                    structuredContent=None,
+                    isError=False,
+                )
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps(models))],
+                structuredContent=None,
+                isError=False,
+            )
         except Exception as e:
             from utils.logging_config import get_logger
             get_logger(__name__).error("List models error: %s", e)
-            return [TextContent(type="text", text=json.dumps({"error": str(e)}))]
+            return CallToolResult(
+                content=[TextContent(type="text", text=json.dumps({"error": str(e)}))],
+                structuredContent=None,
+                isError=False,
+            )
 
     # -------------------------------------------------------------------------
     # UI resources (serve built HTML)
@@ -225,6 +253,9 @@ def create_mcp_http_app(services: dict):
     # Build ASGI app and wrap with auth + CORS
     # -------------------------------------------------------------------------
     app = mcp.streamable_http_app()
+    # Session manager must have its lifespan run by the parent app when mounted
+    # (Starlette does not run lifespans of mounted sub-apps).
+    session_manager = mcp.session_manager
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -232,4 +263,4 @@ def create_mcp_http_app(services: dict):
         allow_headers=["*"],
     )
     app = McpAuthMiddleware(app, api_key_service)
-    return app
+    return app, session_manager
