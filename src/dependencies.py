@@ -159,25 +159,6 @@ def get_optional_user(
     return user_with_token
 
 
-def get_api_key_user(
-    request: Request,
-    api_key_service=Depends(get_api_key_service),
-) -> User:
-    """
-    Require API key authentication (Bearer token or X-API-Key header).
-
-    Sets request.state.user and request.state.api_key_id.
-    Raises HTTP 401 if no valid key is provided.
-
-    This is a sync wrapper; the actual validation is async, so it's
-    used as a regular dependency (FastAPI calls it as a coroutine at startup).
-    """
-    # Note: FastAPI supports async dependencies natively.
-    # We return a semi-lazy object here and do actual validation in
-    # get_api_key_user_async below (used in routes).
-    raise NotImplementedError("Use get_api_key_user_async for API key auth")
-
-
 async def get_api_key_user_async(
     request: Request,
     api_key_service=Depends(get_api_key_service),
