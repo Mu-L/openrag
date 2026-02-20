@@ -24,7 +24,7 @@ async def nudges_from_kb_endpoint(
     user: User = Depends(get_current_user),
 ):
     """Get nudges for a user"""
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     try:
         result = await chat_service.langflow_nudges_chat(
@@ -49,7 +49,7 @@ async def nudges_from_chat_id_endpoint(
     user: User = Depends(get_current_user),
 ):
     """Get nudges for a user based on a previous conversation"""
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     try:
         result = await chat_service.langflow_nudges_chat(

@@ -133,7 +133,7 @@ async def connector_sync(
             connector_type=connector_type,
             max_files=max_files,
         )
-        jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+        jwt_token = user.jwt_token
 
         # Get all active connections for this connector type and user
         connections = await connector_service.connection_manager.list_connections(
@@ -612,7 +612,7 @@ async def sync_all_connectors(
     """
     try:
         await TelemetryClient.send_event(Category.CONNECTOR_OPERATIONS, MessageId.ORB_CONN_SYNC_START)
-        jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+        jwt_token = user.jwt_token
 
         # Cloud connector types to sync
         cloud_connector_types = ["google_drive", "onedrive", "sharepoint"]

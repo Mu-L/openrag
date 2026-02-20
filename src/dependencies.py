@@ -14,6 +14,7 @@ Usage:
     ):
         ...
 """
+import dataclasses
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Request
@@ -115,9 +116,13 @@ def get_current_user(
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    request.state.user = user
-    request.state.jwt_token = auth_token
-    return user
+    # get_effective_jwt_token handles anonymous JWT creation if needed
+    effective_token = session_manager.get_effective_jwt_token(user.user_id, auth_token)
+    user_with_token = dataclasses.replace(user, jwt_token=effective_token)
+
+    request.state.user = user_with_token
+    request.state.jwt_token = effective_token
+    return user_with_token
 
 
 def get_optional_user(
@@ -146,9 +151,13 @@ def get_optional_user(
         return None
 
     user = session_manager.get_user_from_token(auth_token)
-    request.state.user = user
-    request.state.jwt_token = auth_token if user else None
-    return user
+    # get_effective_jwt_token handles anonymous JWT creation if needed
+    effective_token = session_manager.get_effective_jwt_token(user.user_id, auth_token) if user else None
+    user_with_token = dataclasses.replace(user, jwt_token=effective_token) if user else None
+
+    request.state.user = user_with_token
+    request.state.jwt_token = effective_token
+    return user_with_token
 
 
 def get_api_key_user(
@@ -219,8 +228,12 @@ async def get_api_key_user_async(
         provider="api_key",
     )
 
-    request.state.user = user
+    # API Key users don't typically have a JWT for OpenSearch OIDC, 
+    # but we can try to get an effective one if needed
+    user_with_token = dataclasses.replace(user, jwt_token=None)
+
+    request.state.user = user_with_token
     request.state.api_key_id = user_info["key_id"]
     request.state.jwt_token = None
 
-    return user
+    return user_with_token

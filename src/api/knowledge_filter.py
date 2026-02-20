@@ -90,7 +90,7 @@ async def create_knowledge_filter(
         logger.error(f"Failed to normalize query_data: {e}")
         return JSONResponse({"error": f"Invalid queryData format: {str(e)}"}, status_code=400)
 
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     filter_id = str(uuid.uuid4())
     filter_doc = {
@@ -126,7 +126,7 @@ async def search_knowledge_filters(
     user: User = Depends(get_current_user),
 ):
     """Search for knowledge filters by name, description, or query content"""
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
     result = await knowledge_filter_service.search_knowledge_filters(
         body.query, user_id=user.user_id, jwt_token=jwt_token, limit=body.limit
     )
@@ -148,7 +148,7 @@ async def get_knowledge_filter(
     user: User = Depends(get_current_user),
 ):
     """Get a specific knowledge filter by ID"""
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
     result = await knowledge_filter_service.get_knowledge_filter(
         filter_id, user_id=user.user_id, jwt_token=jwt_token
     )
@@ -173,7 +173,7 @@ async def update_knowledge_filter(
     user: User = Depends(get_current_user),
 ):
     """Update an existing knowledge filter by delete + recreate"""
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     existing_result = await knowledge_filter_service.get_knowledge_filter(
         filter_id, user_id=user.user_id, jwt_token=jwt_token
@@ -229,7 +229,7 @@ async def delete_knowledge_filter(
     user: User = Depends(get_current_user),
 ):
     """Delete a knowledge filter"""
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
     result = await knowledge_filter_service.delete_knowledge_filter(
         filter_id, user_id=user.user_id, jwt_token=jwt_token
     )
@@ -255,7 +255,7 @@ async def subscribe_to_knowledge_filter(
     user: User = Depends(get_current_user),
 ):
     """Create a subscription to a knowledge filter"""
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     filter_result = await knowledge_filter_service.get_knowledge_filter(
         filter_id, user_id=user.user_id, jwt_token=jwt_token
@@ -312,7 +312,7 @@ async def list_knowledge_filter_subscriptions(
     user: User = Depends(get_current_user),
 ):
     """List subscriptions for a knowledge filter"""
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
     result = await knowledge_filter_service.get_filter_subscriptions(
         filter_id, user_id=user.user_id, jwt_token=jwt_token
     )
@@ -338,7 +338,7 @@ async def cancel_knowledge_filter_subscription(
     user: User = Depends(get_current_user),
 ):
     """Cancel a subscription to a knowledge filter"""
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     subscriptions_result = await knowledge_filter_service.get_filter_subscriptions(
         filter_id, user_id=user.user_id, jwt_token=jwt_token

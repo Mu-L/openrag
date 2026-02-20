@@ -31,7 +31,7 @@ async def chat_endpoint(
     if not body.prompt:
         return JSONResponse({"error": "Prompt is required"}, status_code=400)
 
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     if body.filters:
         from auth_context import set_search_filters
@@ -81,7 +81,7 @@ async def langflow_endpoint(
     if not body.prompt:
         return JSONResponse({"error": "Prompt is required"}, status_code=400)
 
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     if body.filters:
         from auth_context import set_search_filters

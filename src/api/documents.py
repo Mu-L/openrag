@@ -28,7 +28,7 @@ async def check_filename_exists(
     """Check if a document with a specific filename already exists"""
     from config.settings import get_index_name
 
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     try:
         opensearch_client = session_manager.get_user_opensearch_client(
@@ -75,7 +75,7 @@ async def delete_documents_by_filename(
     """Delete all documents with a specific filename"""
     from config.settings import get_index_name
 
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     try:
         opensearch_client = session_manager.get_user_opensearch_client(

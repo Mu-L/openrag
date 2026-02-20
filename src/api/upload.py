@@ -33,7 +33,6 @@ async def upload(
 ):
     """Upload a single file"""
     try:
-        jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
 
         from config.settings import is_no_auth_mode
 
@@ -49,7 +48,7 @@ async def upload(
         result = await document_service.process_upload_file(
             file,
             owner_user_id=owner_user_id,
-            jwt_token=jwt_token,
+            jwt_token=user.jwt_token,
             owner_name=owner_name,
             owner_email=owner_email,
         )
@@ -82,7 +81,7 @@ async def upload_path(
     if not file_paths:
         return JSONResponse({"error": "No files found in directory"}, status_code=400)
 
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     from config.settings import is_no_auth_mode
 
@@ -125,7 +124,7 @@ async def upload_context(
     filename = file.filename or "uploaded_document"
     user_id = user.user_id if user else None
 
-    jwt_token = session_manager.get_effective_jwt_token(user_id, None)
+    jwt_token = user.jwt_token
 
     doc_result = await document_service.process_upload_context(file, filename)
 
@@ -192,7 +191,7 @@ async def upload_bucket(
     if not keys:
         return JSONResponse({"error": "No files found in bucket"}, status_code=400)
 
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     from models.processors import S3FileProcessor
     from config.settings import is_no_auth_mode

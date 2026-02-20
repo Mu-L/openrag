@@ -28,7 +28,7 @@ async def search(
 ):
     """Search for documents"""
     try:
-        jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+        jwt_token = user.jwt_token
 
         logger.debug(
             "Search API request",

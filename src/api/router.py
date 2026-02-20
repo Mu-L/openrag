@@ -110,7 +110,7 @@ async def _langflow_upload_ingest_task(
         user_id = user.user_id
         user_name = user.name
         user_email = user.email
-        jwt_token = session_manager.get_effective_jwt_token(user_id, None)
+        jwt_token = user.jwt_token
 
         temp_file_paths = []
         original_filenames = []

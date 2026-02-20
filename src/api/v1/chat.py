@@ -90,7 +90,7 @@ async def chat_create_endpoint(
         return JSONResponse({"error": "Message is required"}, status_code=400)
 
     user_id = user.user_id
-    jwt_token = session_manager.get_effective_jwt_token(user_id, None)
+    jwt_token = user.jwt_token
 
     if body.filters:
         set_search_filters(body.filters)

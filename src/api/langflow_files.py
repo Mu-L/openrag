@@ -51,9 +51,7 @@ async def upload_user_file(
             file.content_type or "application/octet-stream",
         )
 
-        jwt_token = session_manager.get_effective_jwt_token(
-            user.user_id if user else None, None
-        )
+        jwt_token = user.jwt_token if user else session_manager.get_effective_jwt_token(None, None)
 
         logger.debug("Calling langflow_file_service.upload_user_file")
         result = await langflow_file_service.upload_user_file(file_tuple, jwt_token)
@@ -109,7 +107,7 @@ async def run_ingestion(
                 tweaks["OpenAIEmbeddings-joRJ6"] = {}
             tweaks["OpenAIEmbeddings-joRJ6"]["model"] = settings["embeddingModel"]
 
-    jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+    jwt_token = user.jwt_token
 
     if jwt_token:
         from auth_context import set_auth_context
@@ -160,7 +158,7 @@ async def upload_and_ingest_user_file(
             except json.JSONDecodeError as e:
                 return JSONResponse({"error": f"Invalid tweaks JSON: {e}"}, status_code=400)
 
-        jwt_token = session_manager.get_effective_jwt_token(user.user_id, None)
+        jwt_token = user.jwt_token
         content = await file.read()
 
         temp_dir = tempfile.gettempdir()
