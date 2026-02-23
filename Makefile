@@ -619,6 +619,22 @@ test-integration: ## Run integration tests (requires infrastructure)
 	@echo "$(CYAN)Make sure to run 'make dev-local' first!$(NC)"
 	uv run pytest tests/integration/ -v
 
+test-integration-upload: ## Run only upload/ingest integration tests
+	@echo "$(YELLOW)Running upload integration tests...$(NC)"
+	uv run pytest tests/integration/ -m section_upload -vv -s
+
+test-integration-search: ## Run only search integration tests
+	@echo "$(YELLOW)Running search integration tests...$(NC)"
+	uv run pytest tests/integration/ -m section_search -vv -s
+
+test-integration-startup: ## Run only startup ingest integration tests
+	@echo "$(YELLOW)Running startup integration tests...$(NC)"
+	uv run pytest tests/integration/ -m section_startup -vv -s
+
+test-integration-langflow: ## Run only Langflow integration tests
+	@echo "$(YELLOW)Running Langflow integration tests...$(NC)"
+	uv run pytest tests/integration/ -m section_langflow -vv -s
+
 test-ci: ## Start infra, run integration + SDK tests, tear down (uses DockerHub images)
 	@set -e; \
 	echo "$(YELLOW)Installing test dependencies...$(NC)"; \

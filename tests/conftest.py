@@ -1,4 +1,3 @@
-import asyncio
 import os
 import tempfile
 from pathlib import Path
@@ -67,7 +66,7 @@ async def onboard_system():
             # If it fails, it might already be onboarded, which is fine
             print(f"[DEBUG] Onboarding returned {resp.status_code}: {resp.text}")
         else:
-            print(f"[DEBUG] Session onboarding completed successfully")
+            print("[DEBUG] Session onboarding completed successfully")
 
     yield
 
@@ -76,14 +75,6 @@ async def onboard_system():
         await clients.close()
     except Exception:
         pass
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture

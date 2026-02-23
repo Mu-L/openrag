@@ -5,11 +5,12 @@ from pathlib import Path
 import httpx
 import pytest
 
-# Files to exclude from ingestion (should match src/main.py)
+from tests.integration.conftest import reload_settings
+
 EXCLUDED_INGESTION_FILES = {"warmup_ocr.pdf"}
 
 
-async def wait_for_ready(client: httpx.AsyncClient, timeout_s: float = 30.0):
+async def wait_for_ready(client: httpx.AsyncClient, timeout_s: float = 60.0):
     deadline = asyncio.get_event_loop().time() + timeout_s
     last_err = None
     while asyncio.get_event_loop().time() < deadline:
@@ -32,37 +33,29 @@ def count_files_in_documents() -> int:
     base_dir = Path(os.getcwd()) / "openrag-documents"
     if not base_dir.is_dir():
         return 0
-    return sum(1 for _ in base_dir.rglob("*") if _.is_file() and _.name not in EXCLUDED_INGESTION_FILES)
-
-
-@pytest.mark.parametrize("disable_langflow_ingest", [True, False])
-@pytest.mark.asyncio
-async def test_startup_ingest_creates_task(disable_langflow_ingest: bool):
-    # Ensure startup ingest runs and choose pipeline per param
-    os.environ["DISABLE_STARTUP_INGEST"] = "false"
-    os.environ["DISABLE_INGEST_WITH_LANGFLOW"] = (
-        "true" if disable_langflow_ingest else "false"
+    return sum(
+        1 for f in base_dir.rglob("*")
+        if f.is_file() and f.name not in EXCLUDED_INGESTION_FILES
     )
-    # Force no-auth mode for simpler endpoint access
-    os.environ["GOOGLE_OAUTH_CLIENT_ID"] = ""
-    os.environ["GOOGLE_OAUTH_CLIENT_SECRET"] = ""
 
-    # Reload settings to pick up env for this test run
-    import sys
 
-    for mod in [
-        "api.router",
-        "api.connector_router",
-        "config.settings",
-        "auth_middleware",
-        "main",
-    ]:
-        sys.modules.pop(mod, None)
+# ---------------------------------------------------------------------------
+# SECTION: Startup
+# ---------------------------------------------------------------------------
 
-    from main import create_app, startup_tasks
-    from config.settings import clients, get_index_name
+@pytest.mark.section_startup
+@pytest.mark.parametrize("disable_langflow_ingest", [True, False])
+async def test_startup_ingest_creates_task(disable_langflow_ingest: bool):
+    ctx = reload_settings({
+        "DISABLE_STARTUP_INGEST": "false",
+        "DISABLE_INGEST_WITH_LANGFLOW": "true" if disable_langflow_ingest else "false",
+    })
+    clients = ctx["clients"]
+    create_app = ctx["create_app"]
+    startup_tasks = ctx["startup_tasks"]
+    ensure_index = ctx["_ensure_opensearch_index"]
+    get_index_name = ctx["get_index_name"]
 
-    # Ensure a clean index before startup
     await clients.initialize()
     try:
         await clients.opensearch.indices.delete(index=get_index_name())
@@ -70,12 +63,8 @@ async def test_startup_ingest_creates_task(disable_langflow_ingest: bool):
         pass
 
     app = await create_app()
-    # Trigger startup tasks explicitly
     await startup_tasks(app.state.services)
-
-    # Ensure index exists for tests (startup_tasks only creates it if DISABLE_INGEST_WITH_LANGFLOW=True)
-    from main import _ensure_opensearch_index
-    await _ensure_opensearch_index()
+    await ensure_index()
 
     transport = httpx.ASGITransport(app=app)
     try:
@@ -84,7 +73,6 @@ async def test_startup_ingest_creates_task(disable_langflow_ingest: bool):
 
             expected_files = count_files_in_documents()
 
-            # Poll /tasks until we see at least one startup ingest task
             async def _wait_for_task(timeout_s: float = 60.0):
                 deadline = asyncio.get_event_loop().time() + timeout_s
                 last = None
@@ -101,9 +89,8 @@ async def test_startup_ingest_creates_task(disable_langflow_ingest: bool):
 
             tasks = await _wait_for_task()
             if expected_files == 0:
-                return  # Nothing to do
+                return
             if not (isinstance(tasks, list) and len(tasks) > 0):
-                # Fallback: verify that documents were indexed as a sign of startup ingest
                 sr = await client.post("/search", json={"query": "*", "limit": 1})
                 assert sr.status_code == 200, sr.text
                 total = sr.json().get("total")
@@ -113,9 +100,8 @@ async def test_startup_ingest_creates_task(disable_langflow_ingest: bool):
             assert "task_id" in newest
             assert newest.get("total_files") == expected_files
     finally:
-        # Explicitly close global clients to avoid aiohttp warnings
-        from config.settings import clients
+        from config.settings import clients as _clients
         try:
-            await clients.close()
+            await _clients.close()
         except Exception:
             pass
