@@ -321,10 +321,6 @@ class AppClients:
             http_compress=True,
         )
 
-        # Wait for OpenSearch to be ready before proceeding
-        from utils.opensearch_utils import wait_for_opensearch
-        await wait_for_opensearch(self.opensearch)
-
         # Initialize patched OpenAI client if API key is available
         # This allows the app to start even if OPENAI_API_KEY is not set yet
         # (e.g., when it will be provided during onboarding)
