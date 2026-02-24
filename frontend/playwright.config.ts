@@ -17,7 +17,6 @@ export default defineConfig({
   timeout: 5 * 60 * 1000,
   
   // Setup hook to run before all tests
-  // globalSetup: require.resolve("./tests/globalSetup.ts"), // Removed to avoid race condition. setup is now in webServer command.
 
   use: {
     baseURL: `http://localhost:${PORT}`,
