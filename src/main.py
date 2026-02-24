@@ -15,9 +15,6 @@ from utils.telemetry import TelemetryClient, Category, MessageId
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-# Create process pool FIRST, before any torch/CUDA imports
-from utils.process_pool import process_pool  # isort: skip
-import torch
 
 # API endpoints
 from api import (
@@ -78,20 +75,6 @@ from session_manager import SessionManager
 
 configure_from_env()
 logger = get_logger(__name__)
-
-
-
-
-
-# Set multiprocessing start method to 'spawn' for CUDA compatibility
-multiprocessing.set_start_method("spawn", force=True)
-
-
-logger.info(
-    "CUDA device information",
-    cuda_available=torch.cuda.is_available(),
-    cuda_version=torch.version.cuda,
-)
 
 # Files to exclude from startup ingestion
 EXCLUDED_INGESTION_FILES = {"warmup_ocr.pdf"}
@@ -639,17 +622,12 @@ async def initialize_services():
     # Initialize services
     document_service = DocumentService(session_manager=session_manager)
     search_service = SearchService(session_manager)
-    task_service = TaskService(document_service, process_pool, ingestion_timeout=INGESTION_TIMEOUT)
+    task_service = TaskService(document_service, ingestion_timeout=INGESTION_TIMEOUT)
     chat_service = ChatService()
     flows_service = FlowsService()
     knowledge_filter_service = KnowledgeFilterService(session_manager)
     models_service = ModelsService()
     monitor_service = MonitorService(session_manager)
-
-    # Set process pool for document service
-    document_service.process_pool = process_pool
-
-    # Initialize connector service
 
     # Initialize both connector services
     langflow_connector_service = LangflowConnectorService(
@@ -657,8 +635,7 @@ async def initialize_services():
         session_manager=session_manager,
     )
     openrag_connector_service = ConnectorService(
-        patched_async_client=clients,  # Pass the clients object itself
-        process_pool=process_pool,
+        patched_async_client=clients,
         embed_model=get_embedding_model(),
         index_name=get_index_name(),
         task_service=task_service,

@@ -639,9 +639,25 @@ test-ci: ## Start infra, run integration + SDK tests, tear down (uses DockerHub 
 	$(CONTAINER_RUNTIME) build --no-cache -t langflowai/openrag-opensearch:latest -f Dockerfile .; \
 	echo "$(YELLOW)Starting infra (OpenSearch + Dashboards + Langflow + Backend + Frontend) with CPU containers$(NC)"; \
 	OPENSEARCH_HOST=opensearch $(COMPOSE_CMD) up -d opensearch dashboards langflow openrag-backend openrag-frontend; \
+	echo "$(CYAN)Architecture: $$(uname -m), Platform: $$(uname -s)$(NC)"; \
 	echo "$(YELLOW)Starting docling-serve...$(NC)"; \
-	DOCLING_ENDPOINT=$$(uv run python scripts/docling_ctl.py start --port 5001 | grep "Endpoint:" | awk '{print $$2}'); \
+	DOCLING_START_FAILED=0; \
+	DOCLING_START_OUTPUT=$$(uv run python scripts/docling_ctl.py start --port 5001 --timeout 180 2>&1) || DOCLING_START_FAILED=1; \
+	echo "$$DOCLING_START_OUTPUT"; \
+	if [ "$$DOCLING_START_FAILED" = "1" ]; then \
+		echo "$(RED)ERROR: docling_ctl.py start failed. Output above.$(NC)"; \
+		uv run python scripts/docling_ctl.py status 2>&1 || true; \
+		$(COMPOSE_CMD) down -v 2>/dev/null || true; \
+		exit 1; \
+	fi; \
+	DOCLING_ENDPOINT=$$(echo "$$DOCLING_START_OUTPUT" | grep "Endpoint:" | awk '{print $$2}'); \
+	if [ -z "$$DOCLING_ENDPOINT" ]; then \
+		echo "$(RED)WARNING: docling-serve did not report an endpoint. Defaulting to http://localhost:5001$(NC)"; \
+		DOCLING_ENDPOINT="http://localhost:5001"; \
+	fi; \
 	echo "$(PURPLE)Docling-serve started at $$DOCLING_ENDPOINT$(NC)"; \
+	echo "$(YELLOW)Docling-serve status check:$(NC)"; \
+	uv run python scripts/docling_ctl.py status 2>&1 || true; \
 	echo "$(YELLOW)Waiting for backend OIDC endpoint...$(NC)"; \
 	for i in $$(seq 1 60); do \
 		$(CONTAINER_RUNTIME) exec openrag-backend curl -s http://localhost:8000/.well-known/openid-configuration >/dev/null 2>&1 && break || sleep 2; \
@@ -673,6 +689,15 @@ test-ci: ## Start infra, run integration + SDK tests, tear down (uses DockerHub 
 	for i in $$(seq 1 60); do \
 		curl -s $${DOCLING_ENDPOINT}/health >/dev/null 2>&1 && break || sleep 2; \
 	done; \
+	if ! curl -s $${DOCLING_ENDPOINT}/health >/dev/null 2>&1; then \
+		echo "$(RED)ERROR: docling-serve is not healthy at $$DOCLING_ENDPOINT after waiting$(NC)"; \
+		echo "$(YELLOW)Docling status:$(NC)"; \
+		uv run python scripts/docling_ctl.py status 2>&1 || true; \
+		echo "$(RED)Aborting: docling-serve is required for integration tests.$(NC)"; \
+		uv run python scripts/docling_ctl.py stop || true; \
+		$(COMPOSE_CMD) down -v 2>/dev/null || true; \
+		exit 1; \
+	fi; \
 	echo "$(PURPLE)Running integration tests$(NC)"; \
 	LOG_LEVEL=$${LOG_LEVEL:-DEBUG} \
 	GOOGLE_OAUTH_CLIENT_ID="" \
@@ -725,10 +750,26 @@ test-ci-local: ## Same as test-ci but builds all images locally
 	$(CONTAINER_RUNTIME) build -t langflowai/openrag-frontend:latest -f Dockerfile.frontend .; \
 	$(CONTAINER_RUNTIME) build -t langflowai/openrag-langflow:latest -f Dockerfile.langflow .; \
 	echo "$(YELLOW)Starting infra (OpenSearch + Dashboards + Langflow + Backend + Frontend) with CPU containers$(NC)"; \
+	echo "$(CYAN)Architecture: $$(uname -m), Platform: $$(uname -s)$(NC)"; \
 	OPENSEARCH_HOST=opensearch $(COMPOSE_CMD) up -d opensearch dashboards langflow openrag-backend openrag-frontend; \
 	echo "$(YELLOW)Starting docling-serve...$(NC)"; \
-	DOCLING_ENDPOINT=$$(uv run python scripts/docling_ctl.py start --port 5001 | grep "Endpoint:" | awk '{print $$2}'); \
+	DOCLING_START_FAILED=0; \
+	DOCLING_START_OUTPUT=$$(uv run python scripts/docling_ctl.py start --port 5001 --timeout 180 2>&1) || DOCLING_START_FAILED=1; \
+	echo "$$DOCLING_START_OUTPUT"; \
+	if [ "$$DOCLING_START_FAILED" = "1" ]; then \
+		echo "$(RED)ERROR: docling_ctl.py start failed. Output above.$(NC)"; \
+		uv run python scripts/docling_ctl.py status 2>&1 || true; \
+		$(COMPOSE_CMD) down -v 2>/dev/null || true; \
+		exit 1; \
+	fi; \
+	DOCLING_ENDPOINT=$$(echo "$$DOCLING_START_OUTPUT" | grep "Endpoint:" | awk '{print $$2}'); \
+	if [ -z "$$DOCLING_ENDPOINT" ]; then \
+		echo "$(RED)WARNING: docling-serve did not report an endpoint. Defaulting to http://localhost:5001$(NC)"; \
+		DOCLING_ENDPOINT="http://localhost:5001"; \
+	fi; \
 	echo "$(PURPLE)Docling-serve started at $$DOCLING_ENDPOINT$(NC)"; \
+	echo "$(YELLOW)Docling-serve status check:$(NC)"; \
+	uv run python scripts/docling_ctl.py status 2>&1 || true; \
 	echo "$(YELLOW)Waiting for backend OIDC endpoint...$(NC)"; \
 	for i in $$(seq 1 60); do \
 		$(CONTAINER_RUNTIME) exec openrag-backend curl -s http://localhost:8000/.well-known/openid-configuration >/dev/null 2>&1 && break || sleep 2; \
@@ -760,6 +801,15 @@ test-ci-local: ## Same as test-ci but builds all images locally
 	for i in $$(seq 1 60); do \
 		curl -s $${DOCLING_ENDPOINT}/health >/dev/null 2>&1 && break || sleep 2; \
 	done; \
+	if ! curl -s $${DOCLING_ENDPOINT}/health >/dev/null 2>&1; then \
+		echo "$(RED)ERROR: docling-serve is not healthy at $$DOCLING_ENDPOINT after waiting$(NC)"; \
+		echo "$(YELLOW)Docling status:$(NC)"; \
+		uv run python scripts/docling_ctl.py status 2>&1 || true; \
+		echo "$(RED)Aborting: docling-serve is required for integration tests.$(NC)"; \
+		uv run python scripts/docling_ctl.py stop || true; \
+		$(COMPOSE_CMD) down -v 2>/dev/null || true; \
+		exit 1; \
+	fi; \
 	echo "$(PURPLE)Running integration tests$(NC)"; \
 	LOG_LEVEL=$${LOG_LEVEL:-DEBUG} \
 	GOOGLE_OAUTH_CLIENT_ID="" \
