@@ -114,7 +114,6 @@ jobs:
           docker save -o ${{ runner.temp }}/docker-cache/images.tar \
             langflowai/openrag-opensearch:latest \
             langflowai/openrag-backend:latest \
-            langflowai/openrag-frontend:latest \
             langflowai/openrag-langflow:latest \
             opensearchproject/opensearch-dashboards:3.0.0 || true
 
