@@ -673,16 +673,20 @@ test-ci: ## Start infra, run integration + SDK tests, tear down (uses DockerHub 
 		sleep 2; \
 	done; \
 	echo "$(YELLOW)Verifying OIDC authenticator is active in OpenSearch...$(NC)"; \
-	AUTHC_CONFIG=$$(curl -k -s -u admin:$${OPENSEARCH_PASSWORD} https://localhost:9200/_opendistro/_security/api/securityconfig 2>/dev/null); \
-	if echo "$$AUTHC_CONFIG" | grep -q "openid_auth_domain"; then \
-		echo "$(PURPLE)OIDC authenticator configured$(NC)"; \
-		echo "$$AUTHC_CONFIG" | grep -A 5 "openid_auth_domain"; \
-	else \
-		echo "$(RED)OIDC authenticator NOT found in security config!$(NC)"; \
-		echo "Security config:"; \
-		echo "$$AUTHC_CONFIG" | head -50; \
-		exit 1; \
-	fi; \
+	for i in $$(seq 1 30); do \
+		AUTHC_CONFIG=$$(curl -k -s -u admin:$${OPENSEARCH_PASSWORD} https://localhost:9200/_opendistro/_security/api/securityconfig 2>/dev/null || true); \
+		if echo "$$AUTHC_CONFIG" | grep -q "openid_auth_domain"; then \
+			echo "$(PURPLE)OIDC authenticator configured$(NC)"; \
+			echo "$$AUTHC_CONFIG" | grep -A 5 "openid_auth_domain"; \
+			break; \
+		fi; \
+		if [ $$i -eq 30 ]; then \
+			echo "$(RED)OIDC authenticator NOT found or unreachable in time!$(NC)"; \
+			echo "Security config output: $$AUTHC_CONFIG"; \
+			exit 1; \
+		fi; \
+		sleep 2; \
+	done; \
 	echo "$(YELLOW)Waiting for Langflow...$(NC)"; \
 	for i in $$(seq 1 60); do \
 		curl -s http://localhost:7860/ >/dev/null 2>&1 && break || sleep 2; \
@@ -785,16 +789,20 @@ test-ci-local: ## Same as test-ci but builds all images locally
 		sleep 2; \
 	done; \
 	echo "$(YELLOW)Verifying OIDC authenticator is active in OpenSearch...$(NC)"; \
-	AUTHC_CONFIG=$$(curl -k -s -u admin:$${OPENSEARCH_PASSWORD} https://localhost:9200/_opendistro/_security/api/securityconfig 2>/dev/null); \
-	if echo "$$AUTHC_CONFIG" | grep -q "openid_auth_domain"; then \
-		echo "$(PURPLE)OIDC authenticator configured$(NC)"; \
-		echo "$$AUTHC_CONFIG" | grep -A 5 "openid_auth_domain"; \
-	else \
-		echo "$(RED)OIDC authenticator NOT found in security config!$(NC)"; \
-		echo "Security config:"; \
-		echo "$$AUTHC_CONFIG" | head -50; \
-		exit 1; \
-	fi; \
+	for i in $$(seq 1 30); do \
+		AUTHC_CONFIG=$$(curl -k -s -u admin:$${OPENSEARCH_PASSWORD} https://localhost:9200/_opendistro/_security/api/securityconfig 2>/dev/null || true); \
+		if echo "$$AUTHC_CONFIG" | grep -q "openid_auth_domain"; then \
+			echo "$(PURPLE)OIDC authenticator configured$(NC)"; \
+			echo "$$AUTHC_CONFIG" | grep -A 5 "openid_auth_domain"; \
+			break; \
+		fi; \
+		if [ $$i -eq 30 ]; then \
+			echo "$(RED)OIDC authenticator NOT found or unreachable in time!$(NC)"; \
+			echo "Security config output: $$AUTHC_CONFIG"; \
+			exit 1; \
+		fi; \
+		sleep 2; \
+	done; \
 	echo "$(YELLOW)Waiting for Langflow...$(NC)"; \
 	for i in $$(seq 1 60); do \
 		curl -s http://localhost:7860/ >/dev/null 2>&1 && break || sleep 2; \
