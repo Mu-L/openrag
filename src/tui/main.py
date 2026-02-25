@@ -1,5 +1,7 @@
 """Main TUI application for OpenRAG."""
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Iterable, Optional
@@ -683,6 +685,51 @@ def migrate_legacy_data_directories():
     logger.info("Data migration completed successfully")
 
 
+def generate_jwt_keys(keys_dir: Path):
+    """Generate RSA keys for JWT signing if they don't exist.
+
+    This pre-generates keys on the host so containers can read them,
+    avoiding permission issues with Podman rootless mode.
+    """
+    private_key_path = keys_dir / "private_key.pem"
+    public_key_path = keys_dir / "public_key.pem"
+
+    if private_key_path.exists() and public_key_path.exists():
+        logger.debug("JWT keys already exist")
+        return
+
+    try:
+        # Generate private key
+        subprocess.run(
+            ["openssl", "genrsa", "-out", str(private_key_path), "2048"],
+            check=True,
+            capture_output=True,
+        )
+        # Set restrictive permissions on private key (readable by owner only)
+        os.chmod(private_key_path, 0o600)
+
+        # Generate public key from private key
+        subprocess.run(
+            [
+                "openssl",
+                "rsa",
+                "-in", str(private_key_path),
+                "-pubout",
+                "-out", str(public_key_path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        # Set permissions on public key (readable by all)
+        os.chmod(public_key_path, 0o644)
+
+        logger.info("Generated RSA keys for JWT signing")
+    except FileNotFoundError:
+        logger.warning("openssl not found, skipping JWT key generation (will be generated in container)")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to generate RSA keys: {e}")
+
+
 def setup_host_directories():
     """Initialize OpenRAG directory structure on the host.
 
@@ -703,26 +750,17 @@ def setup_host_directories():
         base_dir / "data",
         base_dir / "data" / "opensearch-data",
     ]
-    
+
     for directory in directories:
         directory.mkdir(parents=True, exist_ok=True)
         logger.debug(f"Ensured directory exists: {directory}")
 
+    # Generate JWT keys on host to avoid container permission issues
+    generate_jwt_keys(base_dir / "keys")
 
-def run_tui():
-    """Run the OpenRAG TUI application."""
-    # Check for native Windows before launching TUI
-    from .utils.platform import PlatformDetector
-    platform_detector = PlatformDetector()
 
-    if platform_detector.is_native_windows():
-        print("\n" + "=" * 60)
-        print("⚠️  Native Windows Not Supported")
-        print("=" * 60)
-        print(platform_detector.get_wsl_recommendation())
-        print("=" * 60 + "\n")
-        sys.exit(1)
-
+def _run_tui_app():
+    """Run the existing Textual TUI application."""
     app = None
     try:
         # Migrate legacy data directories from CWD to ~/.openrag/
@@ -730,7 +768,7 @@ def run_tui():
 
         # Initialize host directory structure
         setup_host_directories()
-        
+
         # Keep bundled assets aligned with the packaged versions
         copy_sample_documents(force=True)
         copy_sample_flows(force=True)
@@ -747,6 +785,45 @@ def run_tui():
         if app and hasattr(app, 'docling_manager'):
             app.docling_manager.cleanup()
         sys.exit(0)
+
+
+def run_tui():
+    """Run the OpenRAG application (CLI walkthrough by default, TUI with --tui)."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="openrag",
+        description="OpenRAG — AI-powered document management",
+    )
+    parser.add_argument(
+        "--tui",
+        action="store_true",
+        help="Launch the full terminal UI instead of the CLI walkthrough",
+    )
+    args = parser.parse_args()
+
+    # Check for native Windows before launching anything
+    from .utils.platform import PlatformDetector
+    platform_detector = PlatformDetector()
+
+    if platform_detector.is_native_windows():
+        print("\n" + "=" * 60)
+        print("  Native Windows Not Supported")
+        print("=" * 60)
+        print(platform_detector.get_wsl_recommendation())
+        print("=" * 60 + "\n")
+        sys.exit(1)
+
+    # Run startup prerequisites (install runtime, health checks, etc.)
+    from .utils.startup_checks import run_startup_checks
+    if not run_startup_checks():
+        sys.exit(1)
+
+    if args.tui:
+        _run_tui_app()
+    else:
+        from .cli import run_cli
+        run_cli()
 
 
 if __name__ == "__main__":
