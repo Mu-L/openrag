@@ -73,17 +73,31 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/docker-cache
-          key: docker-images-${{ runner.os }}-${{ hashFiles('docker-compose.yml') }}
+          key: docker-images-v1-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
-            docker-images-${{ runner.os }}-
+            docker-images-v1-${{ runner.os }}-
 
-      - name: Load Cached Docker Images
+      - name: Validate Docker Cache
+        id: validate-docker-cache
         if: steps.cache-docker.outputs.cache-hit == 'true'
         run: |
-          if [ -f ${{ runner.temp }}/docker-cache/images.tar ]; then
-            echo "Loading cached Docker images..."
-            docker load -i ${{ runner.temp }}/docker-cache/images.tar
+          TAR="${{ runner.temp }}/docker-cache/images.tar"
+          # Require at least 100 MB to consider the cache valid
+          MIN_SIZE=$((100 * 1024 * 1024))
+          if [ -f "$TAR" ] && [ "$(stat -c%s "$TAR")" -ge "$MIN_SIZE" ]; then
+            echo "Docker cache is valid ($(du -sh "$TAR" | cut -f1))"
+            echo "valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "Docker cache is invalid or too small, deleting..."
+            rm -f "$TAR"
+            echo "valid=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Load Cached Docker Images
+        if: steps.cache-docker.outputs.cache-hit == 'true' && steps.validate-docker-cache.outputs.valid == 'true'
+        run: |
+          echo "Loading cached Docker images..."
+          docker load -i ${{ runner.temp }}/docker-cache/images.tar
 
       # Cache Playwright browsers using a composite key
       - name: Cache Playwright Browsers
@@ -107,9 +121,10 @@ jobs:
           ./scripts/setup-e2e.sh
 
       - name: Save Docker Images for Caching
-        if: steps.cache-docker.outputs.cache-hit != 'true'
+        if: steps.cache-docker.outputs.cache-hit != 'true' || steps.validate-docker-cache.outputs.valid == 'false'
         run: |
           echo "Saving Docker images to cache..."
+          rm -rf ${{ runner.temp }}/docker-cache
           mkdir -p ${{ runner.temp }}/docker-cache
           docker save -o ${{ runner.temp }}/docker-cache/images.tar \
             langflowai/openrag-opensearch:latest \
