@@ -11,7 +11,7 @@
 <script>!function(){function e(){if(void 0!==window.truste&&window.truste.cma){var e=window.truste.cma.callApi("getConsent",window.location.href)||{},n=1===e[2],t=1===e[3];gtag("consent","update",{ad_storage:n?"granted":"denied",ad_user_data:n?"granted":"denied",ad_personalization:n?"granted":"denied",analytics_storage:t?"granted":"denied"})}}window.addEventListener&&(window.addEventListener("cm_data_subject_consent_changed",e),window.addEventListener("cm_consent_preferences_set",e)),"complete"===document.readyState?e():window.addEventListener("load",e)}()</script>
 <script>window._ibmAnalytics={settings:{name:"DataStax",tealiumProfileName:"ibm-subsidiary"},trustarc:{privacyPolicyLink:"https://ibm.com/privacy"}},window.digitalData={page:{pageInfo:{ibm:{siteId:"IBM_DataStax"}},category:{primaryCategory:"PC230"}}}</script>
 <script src="//1.www.s81c.com/common/stats/ibm-common.js" async="true"></script><link rel="stylesheet" href="/assets/css/styles.29e42e49.css">
-<script src="/assets/js/runtime~main.918cdd0d.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.4cfa6132.js" defer="defer"></script>
 <script src="/assets/js/main.9f175332.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -37,7 +37,7 @@ This example, the following commands stop Podman, increase the machine size to 8
 </li>
 <li class="">
 <p>Use a CPU-only deployment to reduce memory usage.</p>
-<p>For terminal-managed deployments, you can enable <strong>CPU mode</strong> through the terminal&#x27;s <strong>Show Status</strong> option.</p>
+<p>For terminal-managed deployments, you must <a class="" href="/tui#access-the-tui">start the terminal session with <code>--tui</code></a>, such as <code>uv run openrag --tui</code>. Then, click <strong>Status</strong> in the <a class="" href="/tui">TUI</a>, and then click <strong>Switch to CPU mode</strong>.</p>
 <p>For self-managed deployments, CPU-only deployments use the <code>docker-compose.yml</code> file that doesn&#x27;t have GPU overrides.</p>
 </li>
 </ul>
@@ -182,7 +182,7 @@ For example, on macOS, this is typically a user cache directory, such as <code>~
 <p>Select the <strong>Start services</strong> option to restart the OpenRAG containers.</p>
 </li>
 <li class="">
-<p>Select the <strong>Open OpenRAG in a browser</strong> option, and then retry document ingestion.</p>
+<p>Select the <strong>Open OpenRAG in browser</strong> option, and then retry document ingestion.</p>
 </li>
 </ol>
 <p>In contrast to <code>uvx</code>, if you install OpenRAG with <code>uv</code>, dependencies are synced directly from your <code>pyproject.toml</code> file.

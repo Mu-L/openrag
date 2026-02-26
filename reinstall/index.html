@@ -11,7 +11,7 @@
 <script>!function(){function e(){if(void 0!==window.truste&&window.truste.cma){var e=window.truste.cma.callApi("getConsent",window.location.href)||{},n=1===e[2],t=1===e[3];gtag("consent","update",{ad_storage:n?"granted":"denied",ad_user_data:n?"granted":"denied",ad_personalization:n?"granted":"denied",analytics_storage:t?"granted":"denied"})}}window.addEventListener&&(window.addEventListener("cm_data_subject_consent_changed",e),window.addEventListener("cm_consent_preferences_set",e)),"complete"===document.readyState?e():window.addEventListener("load",e)}()</script>
 <script>window._ibmAnalytics={settings:{name:"DataStax",tealiumProfileName:"ibm-subsidiary"},trustarc:{privacyPolicyLink:"https://ibm.com/privacy"}},window.digitalData={page:{pageInfo:{ibm:{siteId:"IBM_DataStax"}},category:{primaryCategory:"PC230"}}}</script>
 <script src="//1.www.s81c.com/common/stats/ibm-common.js" async="true"></script><link rel="stylesheet" href="/assets/css/styles.29e42e49.css">
-<script src="/assets/js/runtime~main.918cdd0d.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.4cfa6132.js" defer="defer"></script>
 <script src="/assets/js/main.9f175332.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -27,7 +27,13 @@ Destroyed containers and deleted data are lost and cannot be recovered after run
 </ol>
 <ol start="2">
 <li class="">
-<p>In your OpenRAG terminal session, select the <strong>Status</strong> option, and then select the <strong>Factory Reset</strong> option to <a class="" href="/manage-services#reset-containers">reset your OpenRAG containers</a>.</p>
+<p><a class="" href="/tui#access-the-tui">Start the terminal session with <code>--tui</code></a>, such as <code>uv run openrag --tui</code> or <code>uvx openrag --tui</code>.</p>
+</li>
+<li class="">
+<p>Click <strong>Status</strong> in the <a class="" href="/tui">TUI</a>.</p>
+</li>
+<li class="">
+<p>Click <strong>Factory Reset</strong> to <a class="" href="/manage-services#reset-containers">reset your OpenRAG containers</a>.</p>
 <div class="theme-admonition theme-admonition-warning admonition_xJq3 alert alert--warning"><div class="admonitionHeading_Gvgb"><span class="admonitionIcon_Rf37"><svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path></svg></span>warning</div><div class="admonitionContent_BuS1"><p>This is a destructive operation that does the following:</p><ul>
 <li class="">Destroys all OpenRAG containers, volumes, and local images.</li>
 <li class="">Prunes any additional container objects.</li>
@@ -35,7 +41,7 @@ Destroyed containers and deleted data are lost and cannot be recovered after run
 </ul><p></p><p></p>Destroyed containers and deleted data are lost and cannot be recovered after running this operation.<p></p></div></div>
 </li>
 <li class="">
-<p>Exit the terminal session.</p>
+<p>Press <kbd>q</kbd> to quit the TUI.</p>
 </li>
 <li class="">
 <p>Optional: Delete or edit <a class="" href="/reference/configuration">OpenRAG&#x27;s <code>.env</code> file</a>, which is stored at <code>~/.openrag/tui</code>.</p>

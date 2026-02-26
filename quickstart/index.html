@@ -11,7 +11,7 @@
 <script>!function(){function e(){if(void 0!==window.truste&&window.truste.cma){var e=window.truste.cma.callApi("getConsent",window.location.href)||{},n=1===e[2],t=1===e[3];gtag("consent","update",{ad_storage:n?"granted":"denied",ad_user_data:n?"granted":"denied",ad_personalization:n?"granted":"denied",analytics_storage:t?"granted":"denied"})}}window.addEventListener&&(window.addEventListener("cm_data_subject_consent_changed",e),window.addEventListener("cm_consent_preferences_set",e)),"complete"===document.readyState?e():window.addEventListener("load",e)}()</script>
 <script>window._ibmAnalytics={settings:{name:"DataStax",tealiumProfileName:"ibm-subsidiary"},trustarc:{privacyPolicyLink:"https://ibm.com/privacy"}},window.digitalData={page:{pageInfo:{ibm:{siteId:"IBM_DataStax"}},category:{primaryCategory:"PC230"}}}</script>
 <script src="//1.www.s81c.com/common/stats/ibm-common.js" async="true"></script><link rel="stylesheet" href="/assets/css/styles.29e42e49.css">
-<script src="/assets/js/runtime~main.918cdd0d.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.4cfa6132.js" defer="defer"></script>
 <script src="/assets/js/main.9f175332.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -44,13 +44,13 @@ See <a class="" href="/install-windows">Install OpenRAG on Windows</a> before pr
 </li>
 <li class="">
 <p>Install OpenRAG and its dependencies with <code>uvx</code>.</p>
-<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">uvx openrag </span><span class="token parameter variable" style="color:#36acaa">--python</span><span class="token plain"> </span><span class="token number" style="color:#36acaa">3.13</span><br></span></code></pre></div></div>
+<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">uvx </span><span class="token parameter variable" style="color:#36acaa">--python</span><span class="token plain"> </span><span class="token number" style="color:#36acaa">3.13</span><span class="token plain"> openrag</span><br></span></code></pre></div></div>
 <p>You might be prompted to install certain dependencies if they aren&#x27;t already present in your environment.
 The entire process can take a few minutes.
 If you encounter errors during installation, see <a class="" href="/support/troubleshoot">Troubleshoot OpenRAG</a>.</p>
 </li>
 <li class="">
-<p>Once the environment is ready, and the OpenRAG terminal session starts, select the <strong>Configure</strong> option.</p>
+<p>Once the environment is ready, the OpenRAG terminal session starts, and begins issuing prompts for OpenRAG configuration settings.</p>
 </li>
 <li class="">
 <p>For the OpenSearch and Langflow <strong>Admin password</strong> prompts, autogenerate or manually enter passwords.</p>
@@ -67,7 +67,7 @@ If all services start successfully, the terminal prints a confirmation message:<
 <div class="language-text codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-text codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">Services are running.</span><br></span></code></pre></div></div>
 </li>
 <li class="">
-<p>Select the <strong>Open OpenRAG in browser</strong> option to launch the OpenRAG application and start the application onboarding process.</p>
+<p>If the OpenRAG app doesn&#x27;t launch automatically, select the <strong>Open OpenRAG in browser</strong> option to launch the OpenRAG app and start the application onboarding process.</p>
 </li>
 <li class="">
 <p>For this quickstart, select the <strong>OpenAI</strong> model provider, enter your OpenAI API key, and then click <strong>Complete</strong>. Use the default settings for all other model options.</p>
