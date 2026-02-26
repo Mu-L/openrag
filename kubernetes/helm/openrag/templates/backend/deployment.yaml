@@ -146,6 +146,11 @@ spec:
                   name: {{ include "openrag.fullname" . }}-opensearch
                   key: password
             {{- end }}
+            - name: OPENSEARCH_JWT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.opensearch_jwt | quote }}
+                  key: token
             - name: OPENSEARCH_INDEX_NAME
               value: {{ .Values.global.opensearch.indexName | quote }}
             # Langflow connection
@@ -164,6 +169,7 @@ spec:
                   key: superuser
             - name: LANGFLOW_SUPERUSER_PASSWORD
               valueFrom:
+                secretKeyRef:
                   name: {{ include "openrag.fullname" . }}-langflow
                   key: superuser-password
             - name: LANGFLOW_KEY

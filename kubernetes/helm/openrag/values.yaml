@@ -113,7 +113,7 @@ langflow:
   # Runtime settings
   deactivateTracing: true
   logLevel: "INFO"                        # DEBUG, INFO, WARNING, ERROR
-  doclingServeUrl: "http://host.docker.internal:5001"
+  doclingServeUrl: ""
   openragQueryFilter: "{}"
 
   # Langfuse Tracking
@@ -211,7 +211,7 @@ backend:
       mountPath: /app/config
 
   # Logging
-  logLevel: "INFO"                        # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  logLevel: "INFO" 
   noColor: false                          # Set true to disable ANSI color codes in log output
   accessLog: true                         # Set false to disable HTTP access log events
 
@@ -230,7 +230,8 @@ backend:
     ingestSampleData: true                # Set true to ingest sample data on startup
 
   # Langflow public URL (for UI links to Langflow)
-  langflowPublicUrl: ""                   # e.g., "https://langflow.example.com"
+  langflowPublicUrl: ""
+  opensearch_jwt: ""
 
   # Webhook configuration for continuous ingestion
   webhook:

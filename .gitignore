@@ -12,6 +12,7 @@ wheels/
 
 # RSA keys for JWT signing
 *.pem
+none
 
 .idea/
 
@@ -27,6 +28,8 @@ wheels/
 .DS_Store
 
 /config/
+
+custom-values.yml
 
 .docling.pid
 
