@@ -7,8 +7,6 @@ import {
   XCircle,
   Clock,
   Loader2,
-  ChevronDown,
-  ChevronUp,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,16 +19,17 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useTask, Task } from "@/contexts/task-context";
+import { TaskCollapsibleSection } from "@/components/task-collapsible-section";
 
 export function TaskNotificationMenu() {
   const { tasks, isFetching, isMenuOpen, isRecentTasksExpanded, cancelTask } =
     useTask();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isRecentOpen, setIsRecentOpen] = useState(false);
 
   // Sync local state with context state
   useEffect(() => {
     if (isRecentTasksExpanded) {
-      setIsExpanded(true);
+      setIsRecentOpen(true);
     }
   }, [isRecentTasksExpanded]);
 
@@ -205,7 +204,7 @@ export function TaskNotificationMenu() {
     <div className="h-full bg-background border-l">
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="p-4 border-b">
+        <div className="py-4 border-t border-muted">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell className="h-5 w-5 text-muted-foreground" />
@@ -229,7 +228,7 @@ export function TaskNotificationMenu() {
         <div className="flex-1 overflow-y-auto">
           {/* Active Tasks */}
           {activeTasks.length > 0 && (
-            <div className="p-4 space-y-3">
+            <div className="space-y-3">
               <h4 className="text-sm font-medium text-muted-foreground">
                 Active Tasks
               </h4>
@@ -321,73 +320,56 @@ export function TaskNotificationMenu() {
 
           {/* Recent Tasks */}
           {recentTasks.length > 0 && (
-            <div className="p-4 space-y-3 border-t border-border/40">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-muted-foreground">
-                  Recent Tasks
-                </h4>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  className="h-6 w-6 p-0"
-                >
-                  {isExpanded ? (
-                    <ChevronUp className="h-3 w-3" />
-                  ) : (
-                    <ChevronDown className="h-3 w-3" />
-                  )}
-                </Button>
-              </div>
+            <div className="border-t border-border/40">
+              <TaskCollapsibleSection
+                title="Recent Tasks"
+                items={recentTasks}
+                isOpen={isRecentOpen}
+                onToggle={() => setIsRecentOpen((prev) => !prev)}
+                emptyText="No recent tasks."
+                containerClassName=""
+                contentClassName="transition-all duration-200"
+                renderItem={(task) => {
+                  const progress = formatTaskProgress(task);
 
-              {isExpanded && (
-                <div className="space-y-2 transition-all duration-200">
-                  {recentTasks.map((task) => {
-                    const progress = formatTaskProgress(task);
-
-                    return (
-                      <div
-                        key={task.task_id}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                      >
-                        {getTaskIcon(task.status)}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium truncate">
-                            Task {task.task_id.substring(0, 8)}...
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatRelativeTime(task.updated_at)}
-                            {formatDuration(task.duration_seconds) && (
-                              <span className="ml-2">
-                                • {formatDuration(task.duration_seconds)}
-                              </span>
-                            )}
-                          </div>
-                          {/* Show final results for completed tasks */}
-                          {task.status === "completed" &&
-                            progress?.detailed && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {progress.detailed.successful} success,{" "}
-                                {progress.detailed.failed} failed
-                                {(progress.detailed.running || 0) > 0 && (
-                                  <span>
-                                    , {progress.detailed.running} running
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          {task.status === "failed" && task.error && (
-                            <div className="text-xs text-red-600 mt-1 truncate">
-                              {task.error}
-                            </div>
+                  return (
+                    <div
+                      key={task.task_id}
+                      className="flex items-center gap-3 p-2 hover:bg-muted/50 transition-colors"
+                    >
+                      {getTaskIcon(task.status)}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium truncate">
+                          Task {task.task_id.substring(0, 8)}...
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatRelativeTime(task.updated_at)}
+                          {formatDuration(task.duration_seconds) && (
+                            <span className="ml-2">
+                              • {formatDuration(task.duration_seconds)}
+                            </span>
                           )}
                         </div>
-                        {getStatusBadge(task.status)}
+                        {task.status === "completed" && progress?.detailed && (
+                          <div className="text-xs text-muted-foreground">
+                            {progress.detailed.successful} success,{" "}
+                            {progress.detailed.failed} failed
+                            {(progress.detailed.running || 0) > 0 && (
+                              <span>, {progress.detailed.running} running</span>
+                            )}
+                          </div>
+                        )}
+                        {task.status === "failed" && task.error && (
+                          <div className="text-xs text-red-600 truncate">
+                            {task.error}
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      {getStatusBadge(task.status)}
+                    </div>
+                  );
+                }}
+              />
             </div>
           )}
 

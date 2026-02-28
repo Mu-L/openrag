@@ -164,6 +164,14 @@ const config = {
   				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
+  			},
+  			failure: {
+  				soft: '#46080933',
+  				file: '#FFA2A2',
+  				log: '#FF6467',
+  				message: '#FFC9C9CC',
+  				scroll: '#FF6464',
+  				muted: '#A66262'
   			}
   		},
   		borderRadius: {

@@ -24,12 +24,28 @@ import { cn } from "@/lib/utils";
 import { AnimatedConditional } from "./animated-conditional";
 import { ChatRenderer } from "./chat-renderer";
 import { Header } from "./header";
+import FailedTasksInfo from "./tasks_details";
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isMenuOpen, closeMenu } = useTask();
-  const { isPanelOpen, closePanelOnly } = useKnowledgeFilter();
+  const { tasks, isMenuOpen, closeMenu } = useTask();
+  const { isPanelOpen, panelMode, closePanelOnly, openIngestionStatusPanel } =
+    useKnowledgeFilter();
+  const failedTasks = tasks.filter((task) => {
+    if (task.status === "failed" || task.status === "error") {
+      return true;
+    }
+
+    // Some tasks can be marked completed while still containing failed files.
+    if ((task.failed_files ?? 0) > 0) {
+      return true;
+    }
+
+    return Object.values(task.files ?? {}).some(
+      (file) => file?.status === "failed" || file?.status === "error",
+    );
+  });
 
   const isOnKnowledgePage = pathname.startsWith("/knowledge");
 
@@ -40,6 +56,19 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isPanelOpen) closeMenu();
   }, [isPanelOpen, closeMenu]);
+
+  // Open ingestion-status panel only when an ingestion task fails.
+  useEffect(() => {
+    const handleIngestionFailed = (_event: Event) => {
+      if (!isOnKnowledgePage) return;
+      openIngestionStatusPanel();
+    };
+
+    window.addEventListener("ingestionFailed", handleIngestionFailed);
+    return () => {
+      window.removeEventListener("ingestionFailed", handleIngestionFailed);
+    };
+  }, [isOnKnowledgePage, openIngestionStatusPanel]);
 
   const { isLoading, isAuthenticated, isNoAuthMode } = useAuth();
   const { isOnboardingComplete } = useChat();
@@ -154,7 +183,11 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <KnowledgeFilterPanel />
+                  {panelMode === "ingestion-status" ? (
+                    <FailedTasksInfo failedTasks={failedTasks}/>
+                  ) : (
+                    <KnowledgeFilterPanel />
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
