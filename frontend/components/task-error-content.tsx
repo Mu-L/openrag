@@ -99,13 +99,15 @@ export function TaskErrorContent({
               );
             })}
           </div>
-          <div className="mt-2 text-[9px] text-failure-scroll/40 flex items-center justify-center gap-1">
-            <div className="flex items-center gap-0">
-            <ArrowUp className="h-2 w-2" />
-            <ArrowDown className="h-2 w-2" />
+          {failedCount > 1 && (
+            <div className="mt-2 text-[9px] text-failure-scroll/40 flex items-center justify-center gap-1">
+              <div className="flex items-center gap-0">
+                <ArrowUp className="h-2 w-2" />
+                <ArrowDown className="h-2 w-2" />
+              </div>
+              <span>scroll · {failedCount} errors</span>
             </div>
-            <span>scroll · {failedCount} errors</span>
-          </div>
+          )}
         </div>
       )}
     </div>
