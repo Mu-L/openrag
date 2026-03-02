@@ -5,8 +5,49 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+DISK_SPACE_ERROR_MESSAGE = (
+    "OpenSearch disk usage has exceeded the critical threshold (>90%). "
+    "Search and indexing operations are blocked. "
+    "Please free up disk space to restore OpenRAG functionality."
+)
+
+# Error strings emitted by OpenSearch when disk watermark thresholds are breached
+_DISK_SPACE_INDICATORS = [
+    "disk watermark",
+    "flood_stage",
+    "flood stage",
+    "disk usage exceeded",
+    "index read-only",
+    "no space left on device",
+    "cluster_block_exception",
+    "forbidden/12",
+    "too_many_requests/12",
+]
+
+
 class OpenSearchNotReadyError(Exception):
     """Raised when OpenSearch fails to become ready within the retry limit."""
+
+
+class OpenSearchDiskSpaceError(Exception):
+    """Raised when OpenSearch operations fail due to insufficient disk space (>90% used)."""
+
+
+def is_disk_space_error(error: Exception) -> bool:
+    """Check whether an exception is caused by OpenSearch disk space constraints.
+
+    OpenSearch blocks write and search operations when disk usage crosses
+    the high-watermark (default 90%) or flood-stage watermark (default 95%).
+    This function detects those error signatures.
+
+    Args:
+        error: The exception to inspect.
+
+    Returns:
+        True if the error is disk-space related, False otherwise.
+    """
+    error_str = str(error).lower()
+    return any(indicator in error_str for indicator in _DISK_SPACE_INDICATORS)
 
 async def wait_for_opensearch(
     opensearch_client: AsyncOpenSearch,
