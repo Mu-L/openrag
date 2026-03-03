@@ -56,6 +56,26 @@ class IBMCOSConnector(BaseConnector):
     CLIENT_ID_ENV_VAR = "IBM_COS_API_KEY"
     CLIENT_SECRET_ENV_VAR = "IBM_COS_SERVICE_INSTANCE_ID"
 
+    def get_client_id(self) -> str:
+        """Return IAM API key, or HMAC access key ID as fallback."""
+        val = os.getenv("IBM_COS_API_KEY") or os.getenv("IBM_COS_HMAC_ACCESS_KEY_ID")
+        if val:
+            return val
+        raise ValueError(
+            "IBM COS credentials not set. Provide IBM_COS_API_KEY (IAM) "
+            "or IBM_COS_HMAC_ACCESS_KEY_ID (HMAC)."
+        )
+
+    def get_client_secret(self) -> str:
+        """Return IAM service instance ID, or HMAC secret key as fallback."""
+        val = os.getenv("IBM_COS_SERVICE_INSTANCE_ID") or os.getenv("IBM_COS_HMAC_SECRET_ACCESS_KEY")
+        if val:
+            return val
+        raise ValueError(
+            "IBM COS credentials not set. Provide IBM_COS_SERVICE_INSTANCE_ID (IAM) "
+            "or IBM_COS_HMAC_SECRET_ACCESS_KEY (HMAC)."
+        )
+
     def __init__(self, config: Dict[str, Any]):
         if config is None:
             config = {}
@@ -96,13 +116,30 @@ class IBMCOSConnector(BaseConnector):
             self._authenticated = False
             return False
 
+    def _resolve_bucket_names(self) -> List[str]:
+        """Return configured bucket names, or auto-discover all accessible buckets."""
+        if self.bucket_names:
+            return self.bucket_names
+        try:
+            client = self._get_client()
+            response = client.list_buckets()
+            buckets = [b["Name"] for b in response.get("Buckets", [])]
+            logger.debug(f"IBM COS auto-discovered {len(buckets)} bucket(s): {buckets}")
+            return buckets
+        except Exception as exc:
+            logger.warning(f"IBM COS could not auto-discover buckets: {exc}")
+            return []
+
     async def list_files(
         self,
         page_token: Optional[str] = None,
         max_files: Optional[int] = None,
         **kwargs,
     ) -> Dict[str, Any]:
-        """List objects across all configured buckets.
+        """List objects across all configured (or auto-discovered) buckets.
+
+        If no bucket_names are configured, all buckets accessible with the
+        current credentials are used automatically.
 
         Returns:
             dict with keys:
@@ -111,6 +148,8 @@ class IBMCOSConnector(BaseConnector):
         """
         client = self._get_client()
         files: List[Dict[str, Any]] = []
+
+        bucket_names = self._resolve_bucket_names()
 
         # Page token format: "<bucket_index>:<s3_continuation_token>"
         start_bucket_index = 0
@@ -126,7 +165,7 @@ class IBMCOSConnector(BaseConnector):
 
         next_page_token: Optional[str] = None
 
-        for bucket_index, bucket in enumerate(self.bucket_names):
+        for bucket_index, bucket in enumerate(bucket_names):
             if bucket_index < start_bucket_index:
                 continue
 

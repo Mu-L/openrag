@@ -2,7 +2,7 @@
 
 import { AlertCircle, ArrowLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { type CloudFile, UnifiedCloudPicker } from "@/components/cloud-picker";
 import type { IngestSettings } from "@/components/cloud-picker/types";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,9 @@ import { useSyncConnector } from "@/app/api/mutations/useSyncConnector";
 import { useGetConnectorsQuery } from "@/app/api/queries/useGetConnectorsQuery";
 import { useGetConnectorTokenQuery } from "@/app/api/queries/useGetConnectorTokenQuery";
 
+// Connectors that sync entire buckets/repositories without a file picker
+const DIRECT_SYNC_PROVIDERS = ["ibm_cos"];
+
 // CloudFile interface is now imported from the unified cloud picker
 
 export default function UploadProviderPage() {
@@ -28,6 +31,8 @@ export default function UploadProviderPage() {
   const { data: connectors = [], isLoading: connectorsLoading, error: connectorsError } = useGetConnectorsQuery();
   const connector = connectors.find((c) => c.type === provider);
 
+  const isDirectSyncProvider = DIRECT_SYNC_PROVIDERS.includes(provider);
+
   const { data: tokenData, isLoading: tokenLoading } = useGetConnectorTokenQuery(
     {
       connectorType: provider,
@@ -36,7 +41,8 @@ export default function UploadProviderPage() {
         provider === "sharepoint" ? (connector?.baseUrl as string) : undefined,
     },
     {
-      enabled: !!connector && connector.status === "connected",
+      // Direct-sync providers (e.g. IBM COS) don't use OAuth tokens
+      enabled: !!connector && connector.status === "connected" && !isDirectSyncProvider,
     },
   );
 
@@ -55,7 +61,7 @@ export default function UploadProviderPage() {
   });
 
   const accessToken = tokenData?.access_token || null;
-  const isLoading = connectorsLoading || tokenLoading;
+  const isLoading = connectorsLoading || (!isDirectSyncProvider && tokenLoading);
   const isIngesting = syncMutation.isPending;
 
   // Error handling
@@ -181,6 +187,64 @@ export default function UploadProviderPage() {
             </p>
             <Button onClick={() => router.push("/settings")}>
               Connect {connector.name}
+            </Button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Direct-sync providers (e.g. IBM COS) don't need a file picker or OAuth token.
+  // Show a simple "Sync All" UI instead.
+  if (isDirectSyncProvider && connector.status === "connected") {
+    const handleDirectSync = () => {
+      syncMutation.mutate(
+        {
+          connectorType: connector.type,
+          body: {
+            connection_id: connector.connectionId!,
+            selected_files: [],
+            settings: ingestSettings,
+          },
+        },
+        {
+          onSuccess: (result) => {
+            const taskIds = result.task_ids;
+            if (taskIds && taskIds.length > 0) {
+              addTask(taskIds[0]);
+            }
+            router.push("/knowledge");
+          },
+        },
+      );
+    };
+
+    return (
+      <>
+        <div className="mb-8 flex gap-2 items-center">
+          <Button variant="ghost" onClick={() => router.back()} size="icon">
+            <ArrowLeft size={18} />
+          </Button>
+          <h2 className="text-xl text-[18px] font-semibold">
+            Add from {connector.name}
+          </h2>
+        </div>
+
+        <div className="max-w-3xl mx-auto">
+          <div className="rounded-lg border p-6 text-center space-y-4">
+            <p className="text-muted-foreground">
+              All accessible buckets will be discovered and ingested automatically.
+              You can restrict ingestion to specific buckets by setting{" "}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">bucket_names</code>{" "}
+              in your connection configuration.
+            </p>
+            <Button
+              className="bg-foreground text-background hover:bg-foreground/90 font-semibold"
+              onClick={handleDirectSync}
+              loading={isIngesting}
+              disabled={isIngesting}
+            >
+              {isIngesting ? "Ingesting…" : "Sync All Buckets"}
             </Button>
           </div>
         </div>
