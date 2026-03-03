@@ -4,6 +4,7 @@ import { useConnectConnectorMutation } from "@/app/api/mutations/useConnectConne
 import { useDisconnectConnectorMutation } from "@/app/api/mutations/useDisconnectConnectorMutation";
 import { useGetConnectorsQuery, type Connector as QueryConnector } from "@/app/api/queries/useGetConnectorsQuery";
 import GoogleDriveIcon from "@/components/icons/google-drive-logo";
+import IBMLogo from "@/components/icons/ibm-logo";
 import OneDriveIcon from "@/components/icons/one-drive-logo";
 import SharePointIcon from "@/components/icons/share-point-logo";
 import { useAuth } from "@/contexts/auth-context";
@@ -28,6 +29,7 @@ export default function ConnectorCards() {
             "google-drive": <GoogleDriveIcon />,
             sharepoint: <SharePointIcon />,
             onedrive: <OneDriveIcon />,
+            "ibm-cos": <IBMLogo />,
         };
         return (
             iconMap[iconName] || (

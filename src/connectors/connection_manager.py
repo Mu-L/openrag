@@ -13,6 +13,7 @@ from .base import BaseConnector
 from .google_drive import GoogleDriveConnector
 from .sharepoint import SharePointConnector
 from .onedrive import OneDriveConnector
+from .ibm_cos import IBMCOSConnector
 
 
 @dataclass
@@ -351,6 +352,12 @@ class ConnectionManager:
                 "icon": OneDriveConnector.CONNECTOR_ICON,
                 "available": self._is_connector_available("onedrive"),
             },
+            "ibm_cos": {
+                "name": IBMCOSConnector.CONNECTOR_NAME,
+                "description": IBMCOSConnector.CONNECTOR_DESCRIPTION,
+                "icon": IBMCOSConnector.CONNECTOR_ICON,
+                "available": self._is_connector_available("ibm_cos"),
+            },
         }
 
     def _is_connector_available(self, connector_type: str) -> bool:
@@ -379,6 +386,8 @@ class ConnectionManager:
                 return SharePointConnector(config.config)
             elif config.connector_type == "onedrive":
                 return OneDriveConnector(config.config)
+            elif config.connector_type == "ibm_cos":
+                return IBMCOSConnector(config.config)
             elif config.connector_type == "box":
                 raise NotImplementedError("Box connector not implemented yet")
             elif config.connector_type == "dropbox":

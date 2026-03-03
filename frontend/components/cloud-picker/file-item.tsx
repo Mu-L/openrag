@@ -2,6 +2,7 @@
 
 import { FileText, Folder, Trash2 } from "lucide-react";
 import GoogleDriveIcon from "@/components/icons/google-drive-logo";
+import IBMLogo from "@/components/icons/ibm-logo";
 import OneDriveIcon from "@/components/icons/one-drive-logo";
 import SharePointIcon from "@/components/icons/share-point-logo";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,8 @@ const getProviderIcon = (provider: string) => {
       return <OneDriveIcon />;
     case "sharepoint":
       return <SharePointIcon />;
+    case "ibm_cos":
+      return <IBMLogo />;
     default:
       return <FileText className="h-6 w-6" />;
   }

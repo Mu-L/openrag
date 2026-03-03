@@ -59,6 +59,13 @@ class EnvConfig:
     aws_secret_access_key: str = ""
     langflow_public_url: str = ""
 
+    # IBM Cloud Object Storage settings
+    ibm_cos_api_key: str = ""
+    ibm_cos_service_instance_id: str = ""
+    ibm_cos_endpoint: str = ""
+    ibm_cos_hmac_access_key_id: str = ""
+    ibm_cos_hmac_secret_access_key: str = ""
+
     # Langfuse settings (optional)
     langfuse_secret_key: str = ""
     langfuse_public_key: str = ""
@@ -194,6 +201,11 @@ class EnvManager:
             "AWS_ACCESS_KEY_ID": "aws_access_key_id",
             "AWS_SECRET_ACCESS_KEY": "aws_secret_access_key",  # pragma: allowlist secret
             "LANGFLOW_PUBLIC_URL": "langflow_public_url",
+            "IBM_COS_API_KEY": "ibm_cos_api_key",  # pragma: allowlist secret
+            "IBM_COS_SERVICE_INSTANCE_ID": "ibm_cos_service_instance_id",
+            "IBM_COS_ENDPOINT": "ibm_cos_endpoint",
+            "IBM_COS_HMAC_ACCESS_KEY_ID": "ibm_cos_hmac_access_key_id",
+            "IBM_COS_HMAC_SECRET_ACCESS_KEY": "ibm_cos_hmac_secret_access_key",  # pragma: allowlist secret
             "OPENRAG_DOCUMENTS_PATHS": "openrag_documents_paths",
             "OPENRAG_DOCUMENTS_PATH": "openrag_documents_path",
             "OPENRAG_KEYS_PATH": "openrag_keys_path",
@@ -521,6 +533,11 @@ class EnvManager:
                     ("AWS_ACCESS_KEY_ID", self.config.aws_access_key_id),
                     ("AWS_SECRET_ACCESS_KEY", self.config.aws_secret_access_key),
                     ("LANGFLOW_PUBLIC_URL", self.config.langflow_public_url),
+                    ("IBM_COS_API_KEY", self.config.ibm_cos_api_key),
+                    ("IBM_COS_SERVICE_INSTANCE_ID", self.config.ibm_cos_service_instance_id),
+                    ("IBM_COS_ENDPOINT", self.config.ibm_cos_endpoint),
+                    ("IBM_COS_HMAC_ACCESS_KEY_ID", self.config.ibm_cos_hmac_access_key_id),
+                    ("IBM_COS_HMAC_SECRET_ACCESS_KEY", self.config.ibm_cos_hmac_secret_access_key),
                 ]
 
                 optional_written = False

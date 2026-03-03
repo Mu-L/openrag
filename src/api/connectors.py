@@ -615,7 +615,7 @@ async def sync_all_connectors(
         jwt_token = user.jwt_token
 
         # Cloud connector types to sync
-        cloud_connector_types = ["google_drive", "onedrive", "sharepoint"]
+        cloud_connector_types = ["google_drive", "onedrive", "sharepoint", "ibm_cos"]
         
         all_task_ids = []
         synced_connectors = []
