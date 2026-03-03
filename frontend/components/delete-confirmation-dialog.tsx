@@ -27,7 +27,9 @@ export function formatFilesToDelete(
   return (
     <ul className="list-disc list-inside max-w-[29rem] sm:max-w-[calc(425px-3rem)]">
       {visibleFiles.map((file) => (
-        <li className="my-2 truncate">{file.filename}</li>
+        <li key={file.filename} className="my-2 truncate">
+          {file.filename}
+        </li>
       ))}
       {remainingCount > 0 ? (
         <li>
