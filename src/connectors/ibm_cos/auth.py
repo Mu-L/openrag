@@ -51,16 +51,11 @@ def _resolve_credentials(config: Dict[str, Any]):
 
 
 def _build_resource(config: Dict[str, Any], creds: Dict[str, Any]):
-    """Build an ibm_boto3 resource using resolved credentials."""
-    try:
-        import ibm_boto3
-        from ibm_botocore.client import Config
-    except ImportError as exc:
-        raise ImportError(
-            "ibm-cos-sdk is required for IBM COS integration. "
-            "Install it with: pip install ibm-cos-sdk"
-        ) from exc
+    """Build an S3-compatible resource using resolved credentials.
 
+    HMAC mode uses standard boto3 (no IBM-specific calls, pure S3 protocol).
+    IAM mode uses ibm_boto3 with OAuth signature.
+    """
     auth_mode = config.get("auth_mode", "iam")
 
     if auth_mode == "hmac":
@@ -68,20 +63,35 @@ def _build_resource(config: Dict[str, Any], creds: Dict[str, Any]):
             raise ValueError(
                 "HMAC mode requires hmac_access_key and hmac_secret_key."
             )
-        logger.debug("Creating IBM COS resource with HMAC authentication")
-        return ibm_boto3.resource(
+        try:
+            import boto3
+        except ImportError as exc:
+            raise ImportError(
+                "boto3 is required for IBM COS HMAC mode. "
+                "Install it with: pip install boto3"
+            ) from exc
+        logger.debug("Creating IBM COS resource with HMAC authentication (boto3)")
+        return boto3.resource(
             "s3",
             aws_access_key_id=creds["hmac_access_key"],
             aws_secret_access_key=creds["hmac_secret_key"],
             endpoint_url=creds["endpoint_url"],
         )
 
-    # IAM mode (default)
+    # IAM mode (default) — requires ibm_boto3 for OAuth token handling
+    try:
+        import ibm_boto3
+        from ibm_botocore.client import Config
+    except ImportError as exc:
+        raise ImportError(
+            "ibm-cos-sdk is required for IBM COS IAM mode. "
+            "Install it with: pip install ibm-cos-sdk"
+        ) from exc
     if not (creds["api_key"] and creds["service_instance_id"]):
         raise ValueError(
             "IAM mode requires api_key and service_instance_id."
         )
-    logger.debug("Creating IBM COS resource with IAM authentication")
+    logger.debug("Creating IBM COS resource with IAM authentication (ibm_boto3)")
     return ibm_boto3.resource(
         "s3",
         ibm_api_key_id=creds["api_key"],
@@ -93,16 +103,11 @@ def _build_resource(config: Dict[str, Any], creds: Dict[str, Any]):
 
 
 def _build_client(config: Dict[str, Any], creds: Dict[str, Any]):
-    """Build an ibm_boto3 client using resolved credentials."""
-    try:
-        import ibm_boto3
-        from ibm_botocore.client import Config
-    except ImportError as exc:
-        raise ImportError(
-            "ibm-cos-sdk is required for IBM COS integration. "
-            "Install it with: pip install ibm-cos-sdk"
-        ) from exc
+    """Build an S3-compatible client using resolved credentials.
 
+    HMAC mode uses standard boto3 (no IBM-specific calls, pure S3 protocol).
+    IAM mode uses ibm_boto3 with OAuth signature.
+    """
     auth_mode = config.get("auth_mode", "iam")
 
     if auth_mode == "hmac":
@@ -110,20 +115,35 @@ def _build_client(config: Dict[str, Any], creds: Dict[str, Any]):
             raise ValueError(
                 "HMAC mode requires hmac_access_key and hmac_secret_key."
             )
-        logger.debug("Creating IBM COS client with HMAC authentication")
-        return ibm_boto3.client(
+        try:
+            import boto3
+        except ImportError as exc:
+            raise ImportError(
+                "boto3 is required for IBM COS HMAC mode. "
+                "Install it with: pip install boto3"
+            ) from exc
+        logger.debug("Creating IBM COS client with HMAC authentication (boto3)")
+        return boto3.client(
             "s3",
             aws_access_key_id=creds["hmac_access_key"],
             aws_secret_access_key=creds["hmac_secret_key"],
             endpoint_url=creds["endpoint_url"],
         )
 
-    # IAM mode (default)
+    # IAM mode (default) — requires ibm_boto3 for OAuth token handling
+    try:
+        import ibm_boto3
+        from ibm_botocore.client import Config
+    except ImportError as exc:
+        raise ImportError(
+            "ibm-cos-sdk is required for IBM COS IAM mode. "
+            "Install it with: pip install ibm-cos-sdk"
+        ) from exc
     if not (creds["api_key"] and creds["service_instance_id"]):
         raise ValueError(
             "IAM mode requires api_key and service_instance_id."
         )
-    logger.debug("Creating IBM COS client with IAM authentication")
+    logger.debug("Creating IBM COS client with IAM authentication (ibm_boto3)")
     return ibm_boto3.client(
         "s3",
         ibm_api_key_id=creds["api_key"],
@@ -135,9 +155,10 @@ def _build_client(config: Dict[str, Any], creds: Dict[str, Any]):
 
 
 def create_ibm_cos_resource(config: Dict[str, Any]):
-    """Return an ibm_boto3 S3 resource (high-level API).
+    """Return an S3 resource handle (high-level API).
 
-    Use this for bucket/object operations: Bucket.objects.all(), Object.get(), etc.
+    HMAC mode returns a standard boto3.resource (pure S3, no IBM discovery calls).
+    IAM mode returns an ibm_boto3.resource (OAuth token handling).
 
     Auth mode is determined by config["auth_mode"]:
     - "iam"  (default): IBM_COS_API_KEY + IBM_COS_SERVICE_INSTANCE_ID
@@ -150,7 +171,10 @@ def create_ibm_cos_resource(config: Dict[str, Any]):
 
 
 def create_ibm_cos_client(config: Dict[str, Any]):
-    """Return an ibm_boto3 S3 low-level client.
+    """Return an S3 low-level client.
+
+    HMAC mode returns a standard boto3.client (pure S3, no IBM discovery calls).
+    IAM mode returns an ibm_boto3.client (OAuth token handling).
 
     Used by API endpoints that need raw client operations (e.g. get_object_acl).
     For bucket/object listing and download, prefer create_ibm_cos_resource().

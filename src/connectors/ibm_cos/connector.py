@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from connectors.base import BaseConnector, ConnectorDocument, DocumentACL
 from utils.logging_config import get_logger
 
-from .auth import create_ibm_cos_resource
+from .auth import create_ibm_cos_client, create_ibm_cos_resource
 
 logger = get_logger(__name__)
 
@@ -91,13 +91,25 @@ class IBMCOSConnector(BaseConnector):
             or os.getenv("IBM_COS_SERVICE_INSTANCE_ID", "")
         )
 
-        self._client = None  # Lazy-initialised in authenticate()
+        self._handle = None  # Lazy-initialised on first use
+        # IAM mode uses ibm_boto3.client to avoid internal service-instance
+        # discovery calls that cause XML-parse errors against the real IBM COS API.
+        # HMAC mode uses ibm_boto3.resource (confirmed working with MinIO and S3).
+        self._is_hmac: bool = (config.get("auth_mode", "iam") == "hmac")
 
-    def _get_resource(self):
-        """Return (and cache) the IBM COS boto3-compatible resource."""
-        if self._client is None:
-            self._client = create_ibm_cos_resource(self.config)
-        return self._client
+    def _get_handle(self):
+        """Return (and cache) the appropriate boto3 handle for the configured auth mode.
+
+        - HMAC → ibm_boto3.resource  (S3-compatible, works with MinIO)
+        - IAM  → ibm_boto3.client   (avoids ibm_botocore service-discovery calls
+                                      that break against the real IBM COS API)
+        """
+        if self._handle is None:
+            if self._is_hmac:
+                self._handle = create_ibm_cos_resource(self.config)
+            else:
+                self._handle = create_ibm_cos_client(self.config)
+        return self._handle
 
     # ------------------------------------------------------------------
     # BaseConnector abstract method implementations
@@ -106,9 +118,11 @@ class IBMCOSConnector(BaseConnector):
     async def authenticate(self) -> bool:
         """Validate credentials by listing buckets on the COS service."""
         try:
-            cos = self._get_resource()
-            # Iterating buckets triggers an authenticated API call
-            list(cos.buckets.all())
+            handle = self._get_handle()
+            if self._is_hmac:
+                list(handle.buckets.all())        # resource API
+            else:
+                handle.list_buckets()             # client API
             self._authenticated = True
             logger.debug(f"IBM COS authenticated for connection {self.connection_id}")
             return True
@@ -122,8 +136,12 @@ class IBMCOSConnector(BaseConnector):
         if self.bucket_names:
             return self.bucket_names
         try:
-            cos = self._get_resource()
-            buckets = [b.name for b in cos.buckets.all()]
+            handle = self._get_handle()
+            if self._is_hmac:
+                buckets = [b.name for b in handle.buckets.all()]
+            else:
+                resp = handle.list_buckets()
+                buckets = [b["Name"] for b in resp.get("Buckets", [])]
             logger.debug(f"IBM COS auto-discovered {len(buckets)} bucket(s): {buckets}")
             return buckets
         except Exception as exc:
@@ -148,36 +166,66 @@ class IBMCOSConnector(BaseConnector):
                 "files": list of file dicts (id, name, bucket, size, modified_time)
                 "next_page_token": always None (SDK handles pagination internally)
         """
-        cos = self._get_resource()
+        handle = self._get_handle()
         files: List[Dict[str, Any]] = []
         bucket_names = self._resolve_bucket_names()
 
         for bucket_name in bucket_names:
             try:
-                bucket = cos.Bucket(bucket_name)
-                objects = (
-                    bucket.objects.filter(Prefix=self.prefix)
-                    if self.prefix
-                    else bucket.objects.all()
-                )
-                for obj in objects:
-                    # Skip "directory" placeholder keys (keys ending with /)
-                    if obj.key.endswith("/"):
-                        continue
-                    files.append(
-                        {
-                            "id": _make_file_id(bucket_name, obj.key),
-                            "name": basename(obj.key) or obj.key,
-                            "bucket": bucket_name,
-                            "key": obj.key,
-                            "size": obj.size,
-                            "modified_time": obj.last_modified.isoformat()
-                            if obj.last_modified
-                            else None,
-                        }
+                if self._is_hmac:
+                    # resource API: Bucket.objects.all() handles pagination internally
+                    bucket = handle.Bucket(bucket_name)
+                    objects = (
+                        bucket.objects.filter(Prefix=self.prefix)
+                        if self.prefix
+                        else bucket.objects.all()
                     )
-                    if max_files and len(files) >= max_files:
-                        return {"files": files, "next_page_token": None}
+                    for obj in objects:
+                        if obj.key.endswith("/"):
+                            continue
+                        files.append(
+                            {
+                                "id": _make_file_id(bucket_name, obj.key),
+                                "name": basename(obj.key) or obj.key,
+                                "bucket": bucket_name,
+                                "key": obj.key,
+                                "size": obj.size,
+                                "modified_time": obj.last_modified.isoformat()
+                                if obj.last_modified
+                                else None,
+                            }
+                        )
+                        if max_files and len(files) >= max_files:
+                            return {"files": files, "next_page_token": None}
+                else:
+                    # client API: list_objects_v2 with manual pagination
+                    kwargs: Dict[str, Any] = {"Bucket": bucket_name}
+                    if self.prefix:
+                        kwargs["Prefix"] = self.prefix
+                    while True:
+                        resp = handle.list_objects_v2(**kwargs)
+                        for obj in resp.get("Contents", []):
+                            key = obj["Key"]
+                            if key.endswith("/"):
+                                continue
+                            files.append(
+                                {
+                                    "id": _make_file_id(bucket_name, key),
+                                    "name": basename(key) or key,
+                                    "bucket": bucket_name,
+                                    "key": key,
+                                    "size": obj.get("Size", 0),
+                                    "modified_time": obj["LastModified"].isoformat()
+                                    if obj.get("LastModified")
+                                    else None,
+                                }
+                            )
+                            if max_files and len(files) >= max_files:
+                                return {"files": files, "next_page_token": None}
+                        if resp.get("IsTruncated"):
+                            kwargs["ContinuationToken"] = resp["NextContinuationToken"]
+                        else:
+                            break
 
             except Exception as exc:
                 logger.error(f"Failed to list objects in bucket {bucket_name!r}: {exc}")
@@ -198,10 +246,14 @@ class IBMCOSConnector(BaseConnector):
             ConnectorDocument with content bytes, ACL, and metadata.
         """
         bucket_name, key = _split_file_id(file_id)
-        cos = self._get_resource()
+        handle = self._get_handle()
 
-        # Object.get() returns the full response including Body stream and metadata
-        response = cos.Object(bucket_name, key).get()
+        # Both client.get_object() and resource.Object().get() return the same
+        # response dict: Body stream + ContentType, ContentLength, LastModified.
+        if self._is_hmac:
+            response = handle.Object(bucket_name, key).get()   # resource
+        else:
+            response = handle.get_object(Bucket=bucket_name, Key=key)  # client
         content: bytes = response["Body"].read()
 
         last_modified: datetime = response.get("LastModified") or datetime.now(timezone.utc)
@@ -243,9 +295,11 @@ class IBMCOSConnector(BaseConnector):
         Falls back to a minimal ACL (owner = service instance ID) on failure.
         """
         try:
-            # The resource API exposes the underlying low-level client via meta.client
-            cos = self._get_resource()
-            acl_response = cos.meta.client.get_object_acl(Bucket=bucket, Key=key)
+            handle = self._get_handle()
+            # For resource (HMAC), access the underlying client via meta.client.
+            # For client (IAM), call directly.
+            client = handle.meta.client if self._is_hmac else handle
+            acl_response = client.get_object_acl(Bucket=bucket, Key=key)
 
             owner_id: str = (
                 acl_response.get("Owner", {}).get("DisplayName")
@@ -303,3 +357,12 @@ class IBMCOSConnector(BaseConnector):
     async def cleanup_subscription(self, subscription_id: str) -> bool:
         """No-op: no subscription to clean up."""
         return True
+
+
+
+
+if __name__ == "__main__":
+    connector = IBMCOSConnector({})
+    print(connector.authenticate())
+    print(connector.list_files())
+    # print(connector.get_file_content("test_cos.py"))

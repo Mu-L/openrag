@@ -94,18 +94,18 @@ export function IBMCOSSettingsForm({
                                     <div className="space-y-1">
                                         <LabelWrapper
                                             label="API Key"
-                                            helperText="IBM Cloud IAM API key"
+                                            helperText={'Copy the "apikey" field from your IBM COS Service Credentials JSON'}
                                             id="ibm-cos-api-key"
                                             required
                                         >
                                             <Input
-                                                {...register("api_key")}
+                                                {...register("api_key", { setValueAs: (v) => v?.trim() })}
                                                 id="ibm-cos-api-key"
                                                 type="password"
                                                 placeholder={
                                                     apiKeySet
                                                         ? "•••••••• (loaded from env)"
-                                                        : "Enter API key"
+                                                        : 'apikey value from Service Credentials'
                                                 }
                                                 autoComplete="off"
                                             />
@@ -113,15 +113,15 @@ export function IBMCOSSettingsForm({
                                     </div>
                                     <div className="space-y-1">
                                         <LabelWrapper
-                                            label="Service Instance ID (CRN)"
-                                            helperText="CRN of your COS service instance"
+                                            label="Resource Instance ID"
+                                            helperText={'Copy the "resource_instance_id" field from your IBM COS Service Credentials JSON'}
                                             id="ibm-cos-svc-id"
                                             required
                                         >
                                             <Input
-                                                {...register("service_instance_id")}
+                                                {...register("service_instance_id", { setValueAs: (v) => v?.trim() })}
                                                 id="ibm-cos-svc-id"
-                                                placeholder="crn:v1:bluemix:..."
+                                                placeholder="crn:v1:bluemix:public:cloud-object-storage:..."
                                             />
                                         </LabelWrapper>
                                     </div>
@@ -133,18 +133,19 @@ export function IBMCOSSettingsForm({
                                 <div className="space-y-4">
                                     <div className="space-y-1">
                                         <LabelWrapper
-                                            label="HMAC Access Key ID"
+                                            label="Access Key ID"
+                                            helperText={'Copy "cos_hmac_keys.access_key_id" from your IBM COS Service Credentials JSON'}
                                             id="ibm-cos-hmac-key"
                                             required
                                         >
                                             <Input
-                                                {...register("hmac_access_key")}
+                                                {...register("hmac_access_key", { setValueAs: (v) => v?.trim() })}
                                                 id="ibm-cos-hmac-key"
                                                 type="password"
                                                 placeholder={
                                                     hmacAccessKeySet
                                                         ? "•••••••• (loaded from env)"
-                                                        : "Enter access key ID"
+                                                        : "cos_hmac_keys.access_key_id"
                                                 }
                                                 autoComplete="off"
                                             />
@@ -152,18 +153,19 @@ export function IBMCOSSettingsForm({
                                     </div>
                                     <div className="space-y-1">
                                         <LabelWrapper
-                                            label="HMAC Secret Access Key"
+                                            label="Secret Access Key"
+                                            helperText={'Copy "cos_hmac_keys.secret_access_key" from your IBM COS Service Credentials JSON'}
                                             id="ibm-cos-hmac-secret"
                                             required
                                         >
                                             <Input
-                                                {...register("hmac_secret_key")}
+                                                {...register("hmac_secret_key", { setValueAs: (v) => v?.trim() })}
                                                 id="ibm-cos-hmac-secret"
                                                 type="password"
                                                 placeholder={
                                                     hmacSecretKeySet
                                                         ? "•••••••• (loaded from env)"
-                                                        : "Enter secret access key"
+                                                        : "cos_hmac_keys.secret_access_key"
                                                 }
                                                 autoComplete="off"
                                             />
@@ -180,12 +182,12 @@ export function IBMCOSSettingsForm({
             <div className="space-y-1">
                 <LabelWrapper
                     label="Service Endpoint"
-                    helperText="e.g. https://s3.us-south.cloud-object-storage.appdomain.cloud"
+                    helperText="Public endpoint for your bucket region, e.g. https://s3.us-south.cloud-object-storage.appdomain.cloud — find yours at IBM Cloud → COS → Buckets → Configuration → Endpoints"
                     id="ibm-cos-endpoint"
                     required
                 >
                     <Input
-                        {...register("endpoint", { required: "Endpoint is required" })}
+                        {...register("endpoint", { required: "Endpoint is required", setValueAs: (v) => v?.trim() })}
                         id="ibm-cos-endpoint"
                         placeholder="https://s3.us-south.cloud-object-storage.appdomain.cloud"
                         className={errors.endpoint ? "!border-destructive" : ""}
