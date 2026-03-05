@@ -88,6 +88,11 @@ async def get_synced_file_ids_for_connector(
 class ConnectorSyncBody(BaseModel):
     max_files: Optional[int] = None
     selected_files: Optional[List[Any]] = None
+    # When True, ingest ALL files from the connector (bypasses the existing-files gate).
+    # Used by direct-sync providers like IBM COS on initial ingest.
+    sync_all: bool = False
+    # When set, only ingest files from these buckets (IBM COS specific).
+    bucket_filter: Optional[List[str]] = None
 
 
 async def list_connectors(
@@ -200,6 +205,51 @@ async def connector_sync(
                 jwt_token=jwt_token,
                 file_infos=file_infos,
             )
+        elif body.sync_all or body.bucket_filter:
+            # Full ingest: discover and ingest all files (or files from specific buckets).
+            # Used by direct-sync providers (IBM COS) on initial ingest or per-bucket sync.
+            logger.info(
+                "Full connector ingest requested",
+                connector_type=connector_type,
+                bucket_filter=body.bucket_filter,
+            )
+            connector = await connector_service.get_connector(working_connection.connection_id)
+            if body.bucket_filter:
+                # List only files from the requested buckets, then sync_specific_files
+                original_buckets = connector.bucket_names
+                connector.bucket_names = body.bucket_filter
+                try:
+                    all_file_ids = []
+                    page_token = None
+                    while True:
+                        result = await connector.list_files(page_token=page_token)
+                        for f in result.get("files", []):
+                            all_file_ids.append(f["id"])
+                        page_token = result.get("next_page_token")
+                        if not page_token:
+                            break
+                finally:
+                    connector.bucket_names = original_buckets
+
+                if not all_file_ids:
+                    return JSONResponse(
+                        {"status": "no_files", "message": "No files found in the selected buckets."},
+                        status_code=200,
+                    )
+                task_id = await connector_service.sync_specific_files(
+                    working_connection.connection_id,
+                    user.user_id,
+                    all_file_ids,
+                    jwt_token=jwt_token,
+                )
+            else:
+                # sync_all: ingest everything the connector can see
+                task_id = await connector_service.sync_connector_files(
+                    working_connection.connection_id,
+                    user.user_id,
+                    max_files=max_files,
+                    jwt_token=jwt_token,
+                )
         else:
             # No files specified - sync only files already in OpenSearch for this connector
             # This ensures deleted files stay deleted
@@ -209,7 +259,7 @@ async def connector_sync(
                 session_manager=session_manager,
                 jwt_token=jwt_token,
             )
-            
+
             if not existing_file_ids and not existing_filenames:
                 return JSONResponse(
                     {
@@ -218,7 +268,7 @@ async def connector_sync(
                     },
                     status_code=200,
                 )
-            
+
             # If we have document_ids (connector file IDs), use sync_specific_files
             # Otherwise, use filename filtering with sync_connector_files
             if existing_file_ids:
@@ -786,6 +836,69 @@ async def ibm_cos_list_buckets(
         return JSONResponse({"buckets": buckets})
     except Exception as exc:
         return JSONResponse({"error": f"Failed to list buckets: {exc}"}, status_code=500)
+
+
+async def ibm_cos_bucket_status(
+    connection_id: str,
+    connector_service=Depends(get_connector_service),
+    session_manager=Depends(get_session_manager),
+    user: User = Depends(get_current_user),
+):
+    """Return all buckets for an IBM COS connection with their ingestion status.
+
+    Each entry includes the bucket name, whether it has been ingested (is_synced),
+    and the count of indexed documents from that bucket.
+    """
+    from connectors.ibm_cos.auth import create_ibm_cos_client
+
+    connection = await connector_service.connection_manager.get_connection(connection_id)
+    if not connection or connection.user_id != user.user_id:
+        return JSONResponse({"error": "Connection not found"}, status_code=404)
+    if connection.connector_type != "ibm_cos":
+        return JSONResponse({"error": "Not an IBM COS connection"}, status_code=400)
+
+    # 1. List all buckets from COS
+    try:
+        client = create_ibm_cos_client(connection.config)
+        resp = client.list_buckets()
+        all_buckets = [b["Name"] for b in resp.get("Buckets", [])]
+    except Exception as exc:
+        return JSONResponse({"error": f"Failed to list buckets: {exc}"}, status_code=500)
+
+    # 2. Count indexed documents per bucket from OpenSearch
+    ingested_counts: dict = {}
+    try:
+        opensearch_client = session_manager.get_user_opensearch_client(
+            user.user_id, user.jwt_token
+        )
+        query_body = {
+            "size": 0,
+            "query": {"term": {"connector_type": "ibm_cos"}},
+            "aggs": {
+                "doc_ids": {
+                    "terms": {"field": "document_id", "size": 50000}
+                }
+            },
+        }
+        index_name = get_index_name(user.user_id)
+        os_resp = opensearch_client.search(index=index_name, body=query_body)
+        for bucket_entry in os_resp.get("aggregations", {}).get("doc_ids", {}).get("buckets", []):
+            doc_id = bucket_entry["key"]
+            if "::" in doc_id:
+                bucket_name = doc_id.split("::")[0]
+                ingested_counts[bucket_name] = ingested_counts.get(bucket_name, 0) + 1
+    except Exception:
+        pass  # OpenSearch unavailable — show zero counts
+
+    result = [
+        {
+            "name": bucket,
+            "ingested_count": ingested_counts.get(bucket, 0),
+            "is_synced": ingested_counts.get(bucket, 0) > 0,
+        }
+        for bucket in all_buckets
+    ]
+    return JSONResponse({"buckets": result})
 
 
 # ---------------------------------------------------------------------------

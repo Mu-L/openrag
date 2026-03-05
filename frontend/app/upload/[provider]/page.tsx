@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Circle, RefreshCw } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { type CloudFile, UnifiedCloudPicker } from "@/components/cloud-picker";
@@ -16,9 +16,158 @@ import {
 import { useSyncConnector } from "@/app/api/mutations/useSyncConnector";
 import { useGetConnectorsQuery } from "@/app/api/queries/useGetConnectorsQuery";
 import { useGetConnectorTokenQuery } from "@/app/api/queries/useGetConnectorTokenQuery";
+import { useIBMCOSBucketStatusQuery } from "@/app/api/queries/useIBMCOSBucketStatusQuery";
 
 // Connectors that sync entire buckets/repositories without a file picker
 const DIRECT_SYNC_PROVIDERS = ["ibm_cos"];
+
+// ---------------------------------------------------------------------------
+// IBM COS bucket list with sync status
+// ---------------------------------------------------------------------------
+
+function IBMCOSBucketView({
+  connector,
+  syncMutation,
+  addTask,
+  onBack,
+  onDone,
+}: {
+  connector: any;
+  syncMutation: ReturnType<typeof useSyncConnector>;
+  addTask: (id: string) => void;
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  const { data: buckets, isLoading, refetch } = useIBMCOSBucketStatusQuery(
+    connector.connectionId,
+    { enabled: true },
+  );
+
+  const [syncingBucket, setSyncingBucket] = useState<string | null>(null);
+
+  const syncAll = () => {
+    syncMutation.mutate(
+      {
+        connectorType: connector.type,
+        body: {
+          connection_id: connector.connectionId!,
+          selected_files: [],
+          sync_all: true,
+        },
+      },
+      {
+        onSuccess: (result) => {
+          if (result.task_ids?.length) addTask(result.task_ids[0]);
+          onDone();
+        },
+      },
+    );
+  };
+
+  const syncBucket = (bucketName: string) => {
+    setSyncingBucket(bucketName);
+    syncMutation.mutate(
+      {
+        connectorType: connector.type,
+        body: {
+          connection_id: connector.connectionId!,
+          selected_files: [],
+          bucket_filter: [bucketName],
+        },
+      },
+      {
+        onSuccess: (result) => {
+          setSyncingBucket(null);
+          if (result.task_ids?.length) addTask(result.task_ids[0]);
+          onDone();
+        },
+        onError: () => setSyncingBucket(null),
+      },
+    );
+  };
+
+  return (
+    <>
+      <div className="mb-8 flex gap-2 items-center">
+        <Button variant="ghost" onClick={onBack} size="icon">
+          <ArrowLeft size={18} />
+        </Button>
+        <h2 className="text-xl text-[18px] font-semibold">
+          Add from {connector.name}
+        </h2>
+      </div>
+
+      <div className="max-w-3xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Select a bucket to ingest, or sync everything at once.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isLoading}
+              title="Refresh bucket status"
+            >
+              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+            </Button>
+            <Button
+              className="bg-foreground text-background hover:bg-foreground/90 font-semibold"
+              onClick={syncAll}
+              disabled={syncMutation.isPending}
+            >
+              {syncMutation.isPending && !syncingBucket ? "Ingesting…" : "Sync All Buckets"}
+            </Button>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+          </div>
+        ) : !buckets?.length ? (
+          <div className="rounded-lg border p-6 text-center text-muted-foreground text-sm">
+            No buckets found. Check your IBM COS credentials and endpoint.
+          </div>
+        ) : (
+          <div className="rounded-lg border divide-y">
+            {buckets.map((bucket) => (
+              <div
+                key={bucket.name}
+                className="flex items-center justify-between px-4 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  {bucket.is_synced ? (
+                    <CheckCircle2 size={18} className="text-green-500 shrink-0" />
+                  ) : (
+                    <Circle size={18} className="text-muted-foreground shrink-0" />
+                  )}
+                  <div>
+                    <p className="font-medium text-sm">{bucket.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {bucket.is_synced
+                        ? `${bucket.ingested_count} document${bucket.ingested_count !== 1 ? "s" : ""} ingested`
+                        : "Not yet ingested"}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => syncBucket(bucket.name)}
+                  disabled={syncMutation.isPending}
+                >
+                  {syncingBucket === bucket.name ? "Ingesting…" : bucket.is_synced ? "Re-sync" : "Ingest"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
 
 // CloudFile interface is now imported from the unified cloud picker
 
@@ -194,61 +343,16 @@ export default function UploadProviderPage() {
     );
   }
 
-  // Direct-sync providers (e.g. IBM COS) don't need a file picker or OAuth token.
-  // Show a simple "Sync All" UI instead.
+  // Direct-sync providers (e.g. IBM COS) show a bucket list with sync status.
   if (isDirectSyncProvider && connector.status === "connected") {
-    const handleDirectSync = () => {
-      syncMutation.mutate(
-        {
-          connectorType: connector.type,
-          body: {
-            connection_id: connector.connectionId!,
-            selected_files: [],
-            settings: ingestSettings,
-          },
-        },
-        {
-          onSuccess: (result) => {
-            const taskIds = result.task_ids;
-            if (taskIds && taskIds.length > 0) {
-              addTask(taskIds[0]);
-            }
-            router.push("/knowledge");
-          },
-        },
-      );
-    };
-
     return (
-      <>
-        <div className="mb-8 flex gap-2 items-center">
-          <Button variant="ghost" onClick={() => router.back()} size="icon">
-            <ArrowLeft size={18} />
-          </Button>
-          <h2 className="text-xl text-[18px] font-semibold">
-            Add from {connector.name}
-          </h2>
-        </div>
-
-        <div className="max-w-3xl mx-auto">
-          <div className="rounded-lg border p-6 text-center space-y-4">
-            <p className="text-muted-foreground">
-              All accessible buckets will be discovered and ingested automatically.
-              You can restrict ingestion to specific buckets by setting{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">bucket_names</code>{" "}
-              in your connection configuration.
-            </p>
-            <Button
-              className="bg-foreground text-background hover:bg-foreground/90 font-semibold"
-              onClick={handleDirectSync}
-              loading={isIngesting}
-              disabled={isIngesting}
-            >
-              {isIngesting ? "Ingesting…" : "Sync All Buckets"}
-            </Button>
-          </div>
-        </div>
-      </>
+      <IBMCOSBucketView
+        connector={connector}
+        syncMutation={syncMutation}
+        addTask={addTask}
+        onBack={() => router.back()}
+        onDone={() => router.push("/knowledge")}
+      />
     );
   }
 
