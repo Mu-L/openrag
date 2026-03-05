@@ -120,6 +120,118 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
+  /* IBM Light */
+  [data-theme="ibm"] {
+    --background: 0 0% 97%; /* IBM Gray 10 #f4f4f4 */
+    --foreground: 0 0% 15%; /* IBM Gray 100 #262626 */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 15%;
+    --primary: 217 100% 45%; /* IBM Blue 60 #0f62fe */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 217 100% 35%; /* IBM Blue 70 #0043ce */
+    --secondary: 0 0% 97%;
+    --secondary-foreground: 0 0% 15%;
+    --secondary-hover: 0 0% 90%; /* IBM Gray 20 #e0e0e0 */
+    --muted: 0 0% 90%; /* IBM Gray 20 #e0e0e0 */
+    --muted-foreground: 0 0% 38%; /* IBM Gray 60 #6f6f6f */
+    --accent: 0 0% 90%;
+    --accent-foreground: 0 0% 15%;
+    --border: 0 0% 82%; /* IBM Gray 30 #c6c6c6 */
+    --input: 0 0% 82%;
+    --ring: 217 100% 45%;
+    --placeholder-foreground: 0 0% 56%; /* IBM Gray 50 #8d8d8d */
+
+    --accent-amber: 39 100% 88%;
+    --accent-amber-foreground: 26 90% 37%;
+    --accent-emerald: 149 80% 90%;
+    --accent-emerald-foreground: 161 94% 30%;
+    --accent-red: 0 93% 94%;
+    --accent-red-foreground: 0 72% 51%;
+    --accent-indigo: 226 100% 94%;
+    --accent-indigo-foreground: 217 100% 45%;
+    --accent-pink: 326 78% 95%;
+    --accent-pink-foreground: 333 71% 51%;
+    --accent-purple: 269 100% 95%;
+    --accent-purple-foreground: 271 81% 56%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 26 90% 37%;
+    --warning-foreground: 0 0% 100%;
+
+    --component-icon: #0f62fe;
+    --flow-icon: #0043ce;
+
+    --radius: 0rem; /* IBM uses sharp corners */
+
+    --sidebar-background: 0 0% 90%; /* IBM Gray 20 */
+    --sidebar-foreground: 0 0% 15%;
+    --sidebar-primary: 217 100% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 82%;
+    --sidebar-accent-foreground: 0 0% 15%;
+    --sidebar-border: 0 0% 82%;
+    --sidebar-ring: 217 100% 45%;
+  }
+
+  /* IBM Dark */
+  [data-theme="ibm"].dark {
+    --background: 0 0% 9%; /* IBM Gray 100 #161616 */
+    --foreground: 0 0% 97%; /* IBM Gray 10 #f4f4f4 */
+    --card: 0 0% 12%; /* IBM Gray 90 #1c1c1c → ~#262626 */
+    --card-foreground: 0 0% 97%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 97%;
+    --primary: 217 100% 62%; /* IBM Blue 40 #4589ff */
+    --primary-foreground: 0 0% 9%;
+    --primary-hover: 217 100% 72%; /* IBM Blue 30 #78a9ff */
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 97%;
+    --secondary-hover: 0 0% 18%; /* IBM Gray 80 #393939 */
+    --muted: 0 0% 18%; /* IBM Gray 80 */
+    --muted-foreground: 0 0% 56%; /* IBM Gray 50 #8d8d8d */
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 97%;
+    --border: 0 0% 26%; /* IBM Gray 70 #525252 */
+    --input: 0 0% 26%;
+    --ring: 217 100% 62%;
+    --placeholder-foreground: 0 0% 38%; /* IBM Gray 60 */
+
+    --accent-amber: 22 78% 26%;
+    --accent-amber-foreground: 46 97% 65%;
+    --accent-emerald: 164 86% 16%;
+    --accent-emerald-foreground: 158 64% 52%;
+    --accent-red: 0 63% 31%;
+    --accent-red-foreground: 0 91% 71%;
+    --accent-indigo: 217 80% 25%;
+    --accent-indigo-foreground: 217 100% 72%;
+    --accent-pink: 336 69% 30%;
+    --accent-pink-foreground: 329 86% 70%;
+    --accent-purple: 274 66% 32%;
+    --accent-purple-foreground: 270 95% 75%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 46 97% 65%;
+    --warning-foreground: 0 0% 0%;
+
+    --component-icon: #4589ff;
+    --flow-icon: #78a9ff;
+
+    --radius: 0rem;
+
+    --sidebar-background: 0 0% 12%;
+    --sidebar-foreground: 0 0% 97%;
+    --sidebar-primary: 217 100% 62%;
+    --sidebar-primary-foreground: 0 0% 9%;
+    --sidebar-accent: 0 0% 18%;
+    --sidebar-accent-foreground: 0 0% 97%;
+    --sidebar-border: 0 0% 26%;
+    --sidebar-ring: 217 100% 62%;
+  }
+
   * {
     @apply border-border;
   }

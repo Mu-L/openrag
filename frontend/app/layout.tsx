@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/auth-context";
+import { BrandProvider } from "@/contexts/brand-context";
 import { ChatProvider } from "@/contexts/chat-context";
 import { KnowledgeFilterProvider } from "@/contexts/knowledge-filter-context";
 import { TaskProvider } from "@/contexts/task-context";
@@ -46,19 +47,21 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Providers>
-            <TooltipProvider>
-              <AuthProvider>
-                <TaskProvider>
-                  <KnowledgeFilterProvider>
-                    <ChatProvider>
-                      <LayoutWrapper>{children}</LayoutWrapper>
-                    </ChatProvider>
-                  </KnowledgeFilterProvider>
-                </TaskProvider>
-              </AuthProvider>
-            </TooltipProvider>
-          </Providers>
+          <BrandProvider>
+            <Providers>
+              <TooltipProvider>
+                <AuthProvider>
+                  <TaskProvider>
+                    <KnowledgeFilterProvider>
+                      <ChatProvider>
+                        <LayoutWrapper>{children}</LayoutWrapper>
+                      </ChatProvider>
+                    </KnowledgeFilterProvider>
+                  </TaskProvider>
+                </AuthProvider>
+              </TooltipProvider>
+            </Providers>
+          </BrandProvider>
         </ThemeProvider>
         <Toaster />
       </body>
