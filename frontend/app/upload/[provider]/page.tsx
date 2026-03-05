@@ -3,20 +3,19 @@
 import { AlertCircle, ArrowLeft, CheckCircle2, Circle, RefreshCw } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { useSyncConnector } from "@/app/api/mutations/useSyncConnector";
+import { useGetConnectorsQuery } from "@/app/api/queries/useGetConnectorsQuery";
+import { useGetConnectorTokenQuery } from "@/app/api/queries/useGetConnectorTokenQuery";
+import { useIBMCOSBucketStatusQuery } from "@/app/api/queries/useIBMCOSBucketStatusQuery";
 import { type CloudFile, UnifiedCloudPicker } from "@/components/cloud-picker";
 import type { IngestSettings } from "@/components/cloud-picker/types";
 import { Button } from "@/components/ui/button";
-import { useTask } from "@/contexts/task-context";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-import { useSyncConnector } from "@/app/api/mutations/useSyncConnector";
-import { useGetConnectorsQuery } from "@/app/api/queries/useGetConnectorsQuery";
-import { useGetConnectorTokenQuery } from "@/app/api/queries/useGetConnectorTokenQuery";
-import { useIBMCOSBucketStatusQuery } from "@/app/api/queries/useIBMCOSBucketStatusQuery";
+import { useTask } from "@/contexts/task-context";
 
 // Connectors that sync entire buckets/repositories without a file picker
 const DIRECT_SYNC_PROVIDERS = ["ibm_cos"];
@@ -117,7 +116,9 @@ function IBMCOSBucketView({
               onClick={syncAll}
               disabled={syncMutation.isPending}
             >
-              {syncMutation.isPending && !syncingBucket ? "Ingesting…" : "Sync All Buckets"}
+              {syncMutation.isPending && !syncingBucket
+                ? "Ingesting…"
+                : "Sync All Buckets"}
             </Button>
           </div>
         </div>
@@ -139,7 +140,10 @@ function IBMCOSBucketView({
               >
                 <div className="flex items-center gap-3">
                   {bucket.is_synced ? (
-                    <CheckCircle2 size={18} className="text-green-500 shrink-0" />
+                    <CheckCircle2
+                      size={18}
+                      className="text-green-500 shrink-0"
+                    />
                   ) : (
                     <Circle size={18} className="text-muted-foreground shrink-0" />
                   )}
@@ -158,7 +162,11 @@ function IBMCOSBucketView({
                   onClick={() => syncBucket(bucket.name)}
                   disabled={syncMutation.isPending}
                 >
-                  {syncingBucket === bucket.name ? "Ingesting…" : bucket.is_synced ? "Re-sync" : "Ingest"}
+                  {syncingBucket === bucket.name
+                    ? "Ingesting…"
+                    : bucket.is_synced
+                      ? "Re-sync"
+                      : "Ingest"}
                 </Button>
               </div>
             ))}
@@ -177,23 +185,33 @@ export default function UploadProviderPage() {
   const provider = params.provider as string;
   const { addTask, tasks } = useTask();
 
-  const { data: connectors = [], isLoading: connectorsLoading, error: connectorsError } = useGetConnectorsQuery();
+  const {
+    data: connectors = [],
+    isLoading: connectorsLoading,
+    error: connectorsError,
+  } = useGetConnectorsQuery();
   const connector = connectors.find((c) => c.type === provider);
 
   const isDirectSyncProvider = DIRECT_SYNC_PROVIDERS.includes(provider);
 
-  const { data: tokenData, isLoading: tokenLoading } = useGetConnectorTokenQuery(
-    {
-      connectorType: provider,
-      connectionId: connector?.connectionId,
-      resource:
-        provider === "sharepoint" ? (connector?.baseUrl as string) : undefined,
-    },
-    {
-      // Direct-sync providers (e.g. IBM COS) don't use OAuth tokens
-      enabled: !!connector && connector.status === "connected" && !isDirectSyncProvider,
-    },
-  );
+  const { data: tokenData, isLoading: tokenLoading } =
+    useGetConnectorTokenQuery(
+      {
+        connectorType: provider,
+        connectionId: connector?.connectionId,
+        resource:
+          provider === "sharepoint"
+            ? (connector?.baseUrl as string)
+            : undefined,
+      },
+      {
+        // Direct-sync providers (e.g. IBM COS) don't use OAuth tokens
+        enabled:
+          !!connector &&
+          connector.status === "connected" &&
+          !isDirectSyncProvider,
+      },
+    );
 
   const syncMutation = useSyncConnector();
 
@@ -210,7 +228,8 @@ export default function UploadProviderPage() {
   });
 
   const accessToken = tokenData?.access_token || null;
-  const isLoading = connectorsLoading || (!isDirectSyncProvider && tokenLoading);
+  const isLoading =
+    connectorsLoading || (!isDirectSyncProvider && tokenLoading);
   const isIngesting = syncMutation.isPending;
 
   // Error handling
@@ -219,7 +238,6 @@ export default function UploadProviderPage() {
     : !connector && !connectorsLoading
       ? `Cloud provider "${provider}" is not available or configured.`
       : null;
-
 
   const handleFileSelected = (files: CloudFile[]) => {
     setSelectedFiles(files);
@@ -377,7 +395,8 @@ export default function UploadProviderPage() {
               Access Token Required
             </h2>
             <p className="text-muted-foreground mb-4">
-              Unable to get access token for {connector.name}. Try reconnecting your account.
+              Unable to get access token for {connector.name}. Try reconnecting
+              your account.
             </p>
             <Button onClick={() => router.push("/settings")}>
               Reconnect {connector.name}

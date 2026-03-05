@@ -1,115 +1,119 @@
 "use client";
 
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useConnectConnectorMutation } from "@/app/api/mutations/useConnectConnectorMutation";
 import { useDisconnectConnectorMutation } from "@/app/api/mutations/useDisconnectConnectorMutation";
-import { useGetConnectorsQuery, type Connector as QueryConnector } from "@/app/api/queries/useGetConnectorsQuery";
+import {
+  type Connector as QueryConnector,
+  useGetConnectorsQuery,
+} from "@/app/api/queries/useGetConnectorsQuery";
 import GoogleDriveIcon from "@/components/icons/google-drive-logo";
 import IBMLogo from "@/components/icons/ibm-logo";
 import OneDriveIcon from "@/components/icons/one-drive-logo";
 import SharePointIcon from "@/components/icons/share-point-logo";
 import { useAuth } from "@/contexts/auth-context";
-import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
 import ConnectorCard, { type Connector } from "./connector-card";
 import ConnectorsSkeleton from "./connectors-skeleton";
 import IBMCOSSettingsDialog from "./ibm-cos-settings-dialog";
 
 export default function ConnectorCards() {
-    const { isAuthenticated, isNoAuthMode } = useAuth();
-    const router = useRouter();
-    const [ibmCOSDialogOpen, setIBMCOSDialogOpen] = useState(false);
+  const { isAuthenticated, isNoAuthMode } = useAuth();
+  const router = useRouter();
+  const [ibmCOSDialogOpen, setIBMCOSDialogOpen] = useState(false);
 
-    const { data: queryConnectors = [], isLoading: connectorsLoading } = useGetConnectorsQuery({
-        enabled: isAuthenticated || isNoAuthMode,
+  const { data: queryConnectors = [], isLoading: connectorsLoading } =
+    useGetConnectorsQuery({
+      enabled: isAuthenticated || isNoAuthMode,
     });
 
-    const connectMutation = useConnectConnectorMutation();
-    const disconnectMutation = useDisconnectConnectorMutation();
+  const connectMutation = useConnectConnectorMutation();
+  const disconnectMutation = useDisconnectConnectorMutation();
 
-    const getConnectorIcon = useCallback((iconName: string) => {
-        const iconMap: { [key: string]: React.ReactElement } = {
-            "google-drive": <GoogleDriveIcon />,
-            sharepoint: <SharePointIcon />,
-            onedrive: <OneDriveIcon />,
-            "ibm-cos": <IBMLogo />,
-        };
-        return (
-            iconMap[iconName] || (
-                <div className="w-8 h-8 bg-gray-500 rounded flex items-center justify-center text-white font-bold leading-none shrink-0">
-                    ?
-                </div>
-            )
-        );
-    }, []);
-
-    const connectors = queryConnectors.map((c) => ({
-        ...c,
-        icon: getConnectorIcon(c.icon),
-    })) as Connector[];
-
-    const handleConnect = async (connector: Connector) => {
-        connectMutation.mutate({
-            connector: connector as unknown as QueryConnector,
-            redirectUri: `${window.location.origin}/auth/callback`,
-        });
+  const getConnectorIcon = useCallback((iconName: string) => {
+    const iconMap: { [key: string]: React.ReactElement } = {
+      "google-drive": <GoogleDriveIcon />,
+      sharepoint: <SharePointIcon />,
+      onedrive: <OneDriveIcon />,
+      "ibm-cos": <IBMLogo />,
     };
-
-    const handleDisconnect = async (connector: Connector) => {
-        disconnectMutation.mutate(connector as unknown as QueryConnector);
-    };
-
-    const navigateToKnowledgePage = (connector: Connector) => {
-        const provider = connector.type.replace(/-/g, "_");
-        router.push(`/upload/${provider}`);
-    };
-
-    // Connectors that use a settings dialog instead of OAuth for configuration
-    const getConfigureHandler = (connector: Connector) => {
-        if (connector.type === "ibm_cos") {
-            return () => setIBMCOSDialogOpen(true);
-        }
-        return undefined;
-    };
-
-    if (!connectorsLoading && connectors.length === 0) {
-        return null;
-    }
-
     return (
-        <>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {connectorsLoading ? (
-                    <>
-                        <ConnectorsSkeleton />
-                        <ConnectorsSkeleton />
-                        <ConnectorsSkeleton />
-                    </>
-                ) : (
-                    connectors.map((connector) => (
-                        <ConnectorCard
-                            key={connector.id}
-                            connector={connector}
-                            isConnecting={
-                                connectMutation.isPending &&
-                                connectMutation.variables?.connector.id === connector.id
-                            }
-                            isDisconnecting={
-                                disconnectMutation.isPending &&
-                                (disconnectMutation.variables as any)?.type === connector.type
-                            }
-                            onConnect={handleConnect}
-                            onDisconnect={handleDisconnect}
-                            onNavigateToKnowledge={navigateToKnowledgePage}
-                            onConfigure={getConfigureHandler(connector)}
-                        />
-                    ))
-                )}
-            </div>
-
-            <IBMCOSSettingsDialog
-                open={ibmCOSDialogOpen}
-                setOpen={setIBMCOSDialogOpen}
-            />
-        </>
+      iconMap[iconName] || (
+        <div className="w-8 h-8 bg-gray-500 rounded flex items-center justify-center text-white font-bold leading-none shrink-0">
+          ?
+        </div>
+      )
     );
+  }, []);
+
+  const connectors = queryConnectors.map((c) => ({
+    ...c,
+    icon: getConnectorIcon(c.icon),
+  })) as Connector[];
+
+  const handleConnect = async (connector: Connector) => {
+    connectMutation.mutate({
+      connector: connector as unknown as QueryConnector,
+      redirectUri: `${window.location.origin}/auth/callback`,
+    });
+  };
+
+  const handleDisconnect = async (connector: Connector) => {
+    disconnectMutation.mutate(connector as unknown as QueryConnector);
+  };
+
+  const navigateToKnowledgePage = (connector: Connector) => {
+    const provider = connector.type.replace(/-/g, "_");
+    router.push(`/upload/${provider}`);
+  };
+
+  // Connectors that use a settings dialog instead of OAuth for configuration
+  const getConfigureHandler = (connector: Connector) => {
+    if (connector.type === "ibm_cos") {
+      return () => setIBMCOSDialogOpen(true);
+    }
+    return undefined;
+  };
+
+  if (!connectorsLoading && connectors.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {connectorsLoading ? (
+          <>
+            <ConnectorsSkeleton />
+            <ConnectorsSkeleton />
+            <ConnectorsSkeleton />
+          </>
+        ) : (
+          connectors.map((connector) => (
+            <ConnectorCard
+              key={connector.id}
+              connector={connector}
+              isConnecting={
+                connectMutation.isPending &&
+                connectMutation.variables?.connector.id === connector.id
+              }
+              isDisconnecting={
+                disconnectMutation.isPending &&
+                (disconnectMutation.variables as any)?.type === connector.type
+              }
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              onNavigateToKnowledge={navigateToKnowledgePage}
+              onConfigure={getConfigureHandler(connector)}
+            />
+          ))
+        )}
+      </div>
+
+      <IBMCOSSettingsDialog
+        open={ibmCOSDialogOpen}
+        setOpen={setIBMCOSDialogOpen}
+      />
+    </>
+  );
 }
