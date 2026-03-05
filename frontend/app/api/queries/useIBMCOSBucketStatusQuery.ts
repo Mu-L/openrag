@@ -28,6 +28,7 @@ export function useIBMCOSBucketStatusQuery(
     queryKey: ["ibm-cos-bucket-status", connectionId],
     queryFn: () => fetchIBMCOSBucketStatus(connectionId!),
     enabled: (options?.enabled ?? true) && !!connectionId,
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }

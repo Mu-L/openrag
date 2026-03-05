@@ -1,9 +1,10 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, CheckCircle2, Circle, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, RefreshCw } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSyncConnector } from "@/app/api/mutations/useSyncConnector";
 import { useGetConnectorsQuery } from "@/app/api/queries/useGetConnectorsQuery";
 import { useGetConnectorTokenQuery } from "@/app/api/queries/useGetConnectorTokenQuery";
@@ -38,12 +39,17 @@ function IBMCOSBucketView({
   onBack: () => void;
   onDone: () => void;
 }) {
+  const queryClient = useQueryClient();
   const { data: buckets, isLoading, refetch } = useIBMCOSBucketStatusQuery(
     connector.connectionId,
     { enabled: true },
   );
 
   const [syncingBucket, setSyncingBucket] = useState<string | null>(null);
+
+  const invalidateBucketStatus = () => {
+    queryClient.invalidateQueries({ queryKey: ["ibm-cos-bucket-status", connector.connectionId] });
+  };
 
   const syncAll = () => {
     syncMutation.mutate(
@@ -57,6 +63,7 @@ function IBMCOSBucketView({
       },
       {
         onSuccess: (result) => {
+          invalidateBucketStatus();
           if (result.task_ids?.length) {
             addTask(result.task_ids[0]);
             onDone();
@@ -85,6 +92,7 @@ function IBMCOSBucketView({
       {
         onSuccess: (result) => {
           setSyncingBucket(null);
+          invalidateBucketStatus();
           if (result.task_ids?.length) {
             addTask(result.task_ids[0]);
             onDone();
@@ -154,21 +162,13 @@ function IBMCOSBucketView({
                 className="flex items-center justify-between px-4 py-3"
               >
                 <div className="flex items-center gap-3">
-                  {bucket.is_synced ? (
-                    <CheckCircle2
-                      size={18}
-                      className="text-green-500 shrink-0"
-                    />
-                  ) : (
-                    <Circle size={18} className="text-muted-foreground shrink-0" />
-                  )}
                   <div>
                     <p className="font-medium text-sm">{bucket.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {bucket.is_synced
-                        ? `${bucket.ingested_count} document${bucket.ingested_count !== 1 ? "s" : ""} ingested`
-                        : "Not yet ingested"}
-                    </p>
+                    {bucket.ingested_count > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {bucket.ingested_count} document{bucket.ingested_count !== 1 ? "s" : ""} ingested
+                      </p>
+                    )}
                   </div>
                 </div>
                 <Button
@@ -179,7 +179,7 @@ function IBMCOSBucketView({
                 >
                   {syncingBucket === bucket.name
                     ? "Ingesting…"
-                    : bucket.is_synced
+                    : bucket.ingested_count > 0
                       ? "Re-sync"
                       : "Ingest"}
                 </Button>
