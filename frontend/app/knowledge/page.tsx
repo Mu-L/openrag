@@ -8,6 +8,7 @@ import {
   type ValueFormatterParams,
 } from "ag-grid-community";
 import { AgGridReact, type CustomCellRendererProps } from "ag-grid-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Cloud, FileIcon, Globe, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -63,6 +64,7 @@ function getSourceIcon(connectorType?: string) {
 }
 
 function SearchPage() {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const { files: taskFiles, refreshTasks } = useTask();
   const { parsedFilterData, queryOverride, openIngestionStatusPanel } =
@@ -357,6 +359,9 @@ function SearchPage() {
       );
 
       await Promise.all(deletePromises);
+      await refreshTasks();
+      await queryClient.invalidateQueries({ queryKey: ["search"] });
+      await queryClient.refetchQueries({ queryKey: ["search"] });
 
       toast.success(
         `Successfully deleted ${selectedRows.length} document${
