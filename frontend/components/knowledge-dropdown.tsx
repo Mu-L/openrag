@@ -39,8 +39,8 @@ import { Label } from "@/components/ui/label";
 import { useTask } from "@/contexts/task-context";
 import {
   duplicateCheck,
-  uploadFile as uploadFileUtil,
   uploadFiles,
+  uploadFile as uploadFileUtil,
 } from "@/lib/upload-utils";
 import { cn } from "@/lib/utils";
 
@@ -50,27 +50,42 @@ export const SUPPORTED_FILE_TYPES = {
   "image/*": [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp"],
   "application/pdf": [".pdf"],
   "application/msword": [".doc"],
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+    ".docx",
+  ],
   "application/vnd.ms-powerpoint": [".ppt"],
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": [
+    ".pptx",
+  ],
   "application/vnd.ms-excel": [".xls"],
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+    ".xlsx",
+  ],
   "text/csv": [".csv"],
   "text/plain": [".txt"],
   "text/markdown": [".md"],
   "text/html": [".html", ".htm"],
   "application/rtf": [".rtf"],
   "application/vnd.oasis.opendocument.text": [".odt"],
-  "text/asciidoc": [".adoc", ".asciidoc"]
-}
+  "text/asciidoc": [".adoc", ".asciidoc"],
+};
 
 export const SUPPORTED_EXTENSIONS = Object.values(SUPPORTED_FILE_TYPES).flat();
+
+const FileIconWithColor = ({ className }: { className?: string }) => (
+  <FileIcon className={cn(className, "text-muted-foreground")} />
+);
+
+const FolderIconWithColor = ({ className }: { className?: string }) => (
+  <Folder className={cn(className, "text-muted-foreground")} />
+);
 
 export function KnowledgeDropdown() {
   const { addTask } = useTask();
   const { refetch: refetchTasks } = useGetTasksQuery();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFolderDialog, setShowFolderDialog] = useState(false);
   const [showS3Dialog, setShowS3Dialog] = useState(false);
@@ -184,6 +199,10 @@ export function KnowledgeDropdown() {
       }
     };
     checkAvailability();
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   const handleFileUpload = () => {
@@ -517,16 +536,12 @@ export function KnowledgeDropdown() {
   const menuItems = [
     {
       label: "File",
-      icon: ({ className }: { className?: string }) => (
-        <FileIcon className={cn(className, "text-muted-foreground")} />
-      ),
+      icon: FileIconWithColor,
       onClick: handleFileUpload,
     },
     {
       label: "Folder",
-      icon: ({ className }: { className?: string }) => (
-        <Folder className={cn(className, "text-muted-foreground")} />
-      ),
+      icon: FolderIconWithColor,
       onClick: () => folderInputRef.current?.click(),
     },
     ...(awsEnabled
@@ -544,6 +559,15 @@ export function KnowledgeDropdown() {
   // Comprehensive loading state
   const isLoading =
     fileUploading || folderLoading || s3Loading || isNavigatingToCloud;
+
+  if (!mounted) {
+    return (
+      <Button disabled variant="outline" className="opacity-50">
+        <span>Add Knowledge</span>
+        <ChevronDown className="h-4 w-4 ml-2" />
+      </Button>
+    );
+  }
 
   return (
     <>
@@ -601,6 +625,7 @@ export function KnowledgeDropdown() {
         type="file"
         // @ts-ignore - webkitdirectory is not in TypeScript types but is widely supported
         webkitdirectory=""
+        // @ts-ignore
         directory=""
         multiple
         onChange={handleFolderSelect}
