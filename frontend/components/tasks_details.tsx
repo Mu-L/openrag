@@ -35,13 +35,16 @@ export const FailedTasksInfo = ({ failedTasks }: FailedTasksInfoProps) => {
     const past: Task[] = [];
 
     failedTasks.forEach((task) => {
-      const updatedAtMs = parseTimestampMs(task.updated_at);
-      if (updatedAtMs === null) {
+      // Use created_at as stable anchor so tasks naturally move from
+      // recent -> past even if updated_at gets refreshed by polling.
+      const referenceMs =
+        parseTimestampMs(task.created_at) ?? parseTimestampMs(task.updated_at);
+      if (referenceMs === null) {
         past.push(task);
         return;
       }
 
-      if (nowMs - updatedAtMs < fiveMinutesMs) {
+      if (nowMs - referenceMs < fiveMinutesMs) {
         recent.push(task);
       } else {
         past.push(task);
