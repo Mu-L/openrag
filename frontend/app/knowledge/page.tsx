@@ -294,7 +294,9 @@ function SearchPage() {
               type="button"
               className="inline-flex items-center gap-1 text-red-500 transition hover:text-red-400"
               aria-label="View ingestion error"
-              onClick={openIngestionStatusPanel}
+              onClick={() => {
+                openIngestionStatusPanel();
+              }}
             >
               <StatusBadge
                 status={status}

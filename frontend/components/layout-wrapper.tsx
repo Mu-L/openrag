@@ -50,10 +50,14 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 
   // Only one panel can be open at a time
   useEffect(() => {
-    if (isMenuOpen) closePanelOnly();
+    if (isMenuOpen) {
+      closePanelOnly();
+    }
   }, [isMenuOpen, closePanelOnly]);
   useEffect(() => {
-    if (isPanelOpen) closeMenu();
+    if (isPanelOpen) {
+      closeMenu();
+    }
   }, [isPanelOpen, closeMenu]);
 
   const { isLoading, isAuthenticated, isNoAuthMode } = useAuth();

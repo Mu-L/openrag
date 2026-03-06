@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, XCircle } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { type Task } from "@/contexts/task-context";
@@ -17,6 +17,7 @@ export function TaskErrorContent({
   mode = "recent",
   nowMs = Date.now(),
 }: TaskErrorContentProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const failedEntries = useMemo(
     () =>
       Object.entries(task.files || {}).filter(
@@ -41,7 +42,9 @@ export function TaskErrorContent({
           <XCircle className="h-5 w-5 text-destructive shrink-0" />
           <p className="text-mmd truncate">Task {task.task_id.slice(0, 8)}...</p>
         </div>
-        <p className="text-xs text-destructive shrink-0">{failedCount} failed</p>
+        {!isExpanded && (
+          <p className="text-xs text-destructive shrink-0 border border-failure-pill rounded-full px-2 py-1 bg-failure-soft">Failed</p>
+        )}
       </div>
 
       <div className="flex flex-col justify-between gap-1">
@@ -54,6 +57,7 @@ export function TaskErrorContent({
         type="single"
         collapsible
         className="border-0"
+        onValueChange={(value) => setIsExpanded(Boolean(value))}
       >
         <AccordionItem value="failure-log" className="border-0 rounded-none">
           <AccordionTrigger className="group px-0 py-0 text-sm text-destructive hover:text-destructive/80 transition-colors [&>svg:first-child]:hidden">

@@ -167,6 +167,7 @@ const config = {
   			},
   			failure: {
   				soft: '#46080933',
+  				pill: '#FB2C3633',
   				file: '#FFA2A2',
   				log: '#FF6467',
   				message: '#FFC9C9CC',
