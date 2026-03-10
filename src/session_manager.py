@@ -262,7 +262,11 @@ class SessionManager:
 
     def get_effective_jwt_token(self, user_id: str, jwt_token: str) -> str:
         """Get the effective JWT token, creating anonymous JWT if needed in no-auth mode"""
-        from config.settings import is_no_auth_mode
+        from config.settings import IBM_AUTH_ENABLED, is_no_auth_mode
+
+        # IBM JWT is used as-is — never override with an anonymous OpenRAG JWT
+        if IBM_AUTH_ENABLED and jwt_token:
+            return jwt_token
 
         if jwt_token is not None:
             return jwt_token

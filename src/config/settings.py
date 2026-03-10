@@ -48,6 +48,10 @@ LANGFLOW_KEY = os.getenv("LANGFLOW_KEY")
 SESSION_SECRET = os.getenv("SESSION_SECRET", "your-secret-key-change-in-production")
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
+
+# IBM AMS authentication (Watsonx Data embedded mode)
+IBM_AUTH_ENABLED = os.getenv("IBM_AUTH_ENABLED", "false").lower() in ("true", "1", "yes")
+IBM_JWT_PUBLIC_KEY_URL = os.getenv("IBM_JWT_PUBLIC_KEY_URL", "")
 DOCLING_OCR_ENGINE = os.getenv("DOCLING_OCR_ENGINE")
 
 IBM_AUTH_ENABLED = os.getenv("IBM_AUTH_ENABLED", "false").lower() in ("true", "1", "yes")
@@ -93,6 +97,8 @@ INGESTION_TIMEOUT = get_env_int("INGESTION_TIMEOUT", 3600)
 
 def is_no_auth_mode():
     """Check if we're running in no-auth mode (OAuth credentials missing)"""
+    if IBM_AUTH_ENABLED:
+        return False  # IBM cookie auth is a valid auth mode
     result = not (GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET)
     return result
 
