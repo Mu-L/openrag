@@ -4,7 +4,7 @@ on:
     branches: [test-ephemeral-runner-sudo]
 
 jobs:
-  show-runner-info:
+  test-sudo-access:
     runs-on: 
       labels: ["self-hosted", "linux", "ARM64", "langflow-ai-arm64-40gb-ephemeral-sudo"]
     permissions:
@@ -17,6 +17,11 @@ jobs:
         echo "Sudo test: $(sudo whoami)"
         sudo -l
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'        
+        
     - name: Install Playwright
       run: npm install playwright
 
