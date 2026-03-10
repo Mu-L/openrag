@@ -38,6 +38,14 @@ class AuthService:
         user_id: str = None,
     ) -> dict:
         """Initialize OAuth flow for authentication or data source connection"""
+        from config.settings import IBM_AUTH_ENABLED
+
+        # IBM auth mode — Google OAuth login is not used
+        if IBM_AUTH_ENABLED and purpose == "app_auth":
+            raise ValueError(
+                "IBM AMS authentication is active. Login is handled via the IBM Watsonx Data session cookie."
+            )
+
         # Check if we're in no-auth mode
         if is_no_auth_mode():
             if purpose == "app_auth":
@@ -430,6 +438,26 @@ class AuthService:
 
     async def get_user_info(self, request) -> Optional[dict]:
         """Get current user information from request"""
+        from config.settings import IBM_AUTH_ENABLED
+
+        # IBM auth mode: user is set by get_optional_user from IBM cookie
+        if IBM_AUTH_ENABLED:
+            user = getattr(request.state, "user", None)
+            if user and user.provider == "ibm_ams":
+                return {
+                    "authenticated": True,
+                    "ibm_auth_mode": True,
+                    "user": {
+                        "user_id": user.user_id,
+                        "email": user.email,
+                        "name": user.name,
+                        "picture": user.picture,
+                        "provider": user.provider,
+                        "last_login": user.last_login.isoformat() if user.last_login else None,
+                    },
+                }
+            return {"authenticated": False, "ibm_auth_mode": True, "user": None}
+
         # In no-auth mode, return a consistent response
         if is_no_auth_mode():
             return {"authenticated": False, "user": None, "no_auth_mode": True}

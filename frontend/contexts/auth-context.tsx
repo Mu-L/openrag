@@ -23,6 +23,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isNoAuthMode: boolean;
+  isIbmAuthMode: boolean;
   login: () => void;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
@@ -46,6 +47,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isNoAuthMode, setIsNoAuthMode] = useState(false);
+  const [isIbmAuthMode, setIsIbmAuthMode] = useState(false);
 
   const checkAuth = useCallback(async () => {
     try {
@@ -60,15 +62,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const data = await response.json();
 
-      // Check if we're in no-auth mode
-      if (data.no_auth_mode) {
+      // Check auth mode flags
+      if (data.ibm_auth_mode) {
+        setIsIbmAuthMode(true);
+        setIsNoAuthMode(false);
+        setUser(data.authenticated && data.user ? data.user : null);
+      } else if (data.no_auth_mode) {
         setIsNoAuthMode(true);
+        setIsIbmAuthMode(false);
         setUser(null);
       } else if (data.authenticated && data.user) {
         setIsNoAuthMode(false);
+        setIsIbmAuthMode(false);
         setUser(data.user);
       } else {
         setIsNoAuthMode(false);
+        setIsIbmAuthMode(false);
         setUser(null);
       }
 
@@ -82,9 +91,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = () => {
-    // Don't allow login in no-auth mode
+    // Don't allow login in no-auth mode or IBM auth mode
     if (isNoAuthMode) {
       console.log("Login attempted in no-auth mode - ignored");
+      return;
+    }
+    if (isIbmAuthMode) {
+      console.log("Login attempted in IBM auth mode - ignored (auth managed by IBM Watsonx Data)");
       return;
     }
 
@@ -147,9 +160,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = async () => {
-    // Don't allow logout in no-auth mode
-    if (isNoAuthMode) {
-      console.log("Logout attempted in no-auth mode - ignored");
+    // Don't allow logout in no-auth mode or IBM auth mode
+    if (isNoAuthMode || isIbmAuthMode) {
+      console.log("Logout attempted in no-auth/IBM auth mode - ignored");
       return;
     }
 
@@ -174,8 +187,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const value: AuthContextType = {
     user,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user || isIbmAuthMode,
     isNoAuthMode,
+    isIbmAuthMode,
     login,
     logout,
     refreshAuth,

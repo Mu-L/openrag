@@ -86,6 +86,60 @@ def get_flows_service(services: dict = Depends(get_services)):
 
 
 # ─────────────────────────────────────────────
+# IBM AMS authentication helper
+# ─────────────────────────────────────────────
+
+def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
+    """Extract and validate the IBM AMS JWT from ibm-lh-console-session cookie.
+
+    If *required* is True, raises HTTP 401 on missing/invalid token.
+    If *required* is False, returns None instead of raising.
+    """
+    import auth.ibm_auth as ibm_auth
+    from config.settings import IBM_JWT_PUBLIC_KEY_URL
+
+    ibm_token = request.cookies.get("ibm-lh-console-session")
+    if not ibm_token:
+        if required:
+            raise HTTPException(status_code=401, detail="IBM session cookie missing")
+        request.state.user = None
+        return None
+
+    claims = ibm_auth.validate_ibm_jwt(ibm_token, ibm_auth._cached_public_key)
+
+    # On validation failure, try re-fetching the public key once (key rotation)
+    if claims is None and IBM_JWT_PUBLIC_KEY_URL:
+        try:
+            import httpx
+            from cryptography.hazmat.primitives.serialization import load_pem_public_key
+            with httpx.Client(timeout=10.0) as client:
+                resp = client.get(IBM_JWT_PUBLIC_KEY_URL)
+                resp.raise_for_status()
+                ibm_auth._cached_public_key = load_pem_public_key(resp.content)
+            logger.info("IBM public key refreshed (key rotation detected)")
+            claims = ibm_auth.validate_ibm_jwt(ibm_token, ibm_auth._cached_public_key)
+        except Exception as exc:
+            logger.warning("Failed to refresh IBM public key", error=str(exc))
+
+    if claims is None:
+        if required:
+            raise HTTPException(status_code=401, detail="Invalid or expired IBM session")
+        request.state.user = None
+        return None
+
+    user = User(
+        user_id=claims.get("uid") or claims["sub"],
+        email=claims.get("username", claims["sub"]),
+        name=claims.get("display_name", claims.get("username", claims["sub"])),
+        picture=None,
+        provider="ibm_ams",
+        jwt_token=ibm_token,  # raw IBM JWT passed directly to OpenSearch
+    )
+    request.state.user = user
+    return user
+
+
+# ─────────────────────────────────────────────
 # Authentication dependencies
 # ─────────────────────────────────────────────
 
@@ -99,8 +153,12 @@ def get_current_user(
     Sets request.state.user.
     Raises HTTP 401 if the user is not authenticated.
     """
-    from config.settings import is_no_auth_mode
+    from config.settings import IBM_AUTH_ENABLED, is_no_auth_mode
     from session_manager import AnonymousUser
+
+    # IBM AMS cookie auth takes priority when enabled
+    if IBM_AUTH_ENABLED:
+        return _get_ibm_user(request, required=True)
 
     if is_no_auth_mode():
         user = AnonymousUser()
@@ -135,8 +193,12 @@ def get_optional_user(
     Sets request.state.user (may be None).
     Never raises — returns None if unauthenticated.
     """
-    from config.settings import is_no_auth_mode
+    from config.settings import IBM_AUTH_ENABLED, is_no_auth_mode
     from session_manager import AnonymousUser
+
+    # IBM AMS cookie auth takes priority when enabled
+    if IBM_AUTH_ENABLED:
+        return _get_ibm_user(request, required=False)
 
     if is_no_auth_mode():
         user = AnonymousUser()
