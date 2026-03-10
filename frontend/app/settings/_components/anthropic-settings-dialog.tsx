@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useUpdateSettingsMutation } from "@/app/api/mutations/useUpdateSettingsMutation";
@@ -62,6 +62,11 @@ const AnthropicSettingsDialog = ({
       apiKey: "",
     },
   });
+
+  useEffect(() => {
+    // Reset form state on dialog open
+    if (open) methods.reset();
+  }, [open]);
 
   const { handleSubmit, watch } = methods;
   const apiKey = watch("apiKey");
@@ -204,7 +209,7 @@ const AnthropicSettingsDialog = ({
                     removeMutation.mutate({ remove_anthropic_config: true })
                   }
                 >
-                  {removeMutation.isPending ? "Removing..." : "Confirm Remove"}
+                  {removeMutation.isPending ? "Removing..." : "Remove"}
                 </Button>
               </DialogFooter>
             ) : (

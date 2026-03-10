@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useUpdateSettingsMutation } from "@/app/api/mutations/useUpdateSettingsMutation";
@@ -64,6 +64,11 @@ const OllamaSettingsDialog = ({
         : "http://localhost:11434",
     },
   });
+
+  useEffect(() => {
+    // Reset form state on dialog open
+    if (open) methods.reset();
+  }, [open]);
 
   const { handleSubmit, watch } = methods;
   const endpoint = watch("endpoint");
@@ -197,7 +202,7 @@ const OllamaSettingsDialog = ({
                     removeMutation.mutate({ remove_ollama_config: true })
                   }
                 >
-                  {removeMutation.isPending ? "Removing..." : "Confirm Remove"}
+                  {removeMutation.isPending ? "Removing..." : "Remove"}
                 </Button>
               </DialogFooter>
             ) : (
