@@ -97,6 +97,7 @@ logger = get_logger(__name__)
 
 # Files to exclude from startup ingestion
 EXCLUDED_INGESTION_FILES = {"warmup_ocr.pdf"}
+URL_INGEST_EXCLUDED_INGESTION_FILES = {"openrag-documentation.pdf"}
 
 
 class _VisibleTextHTMLParser(HTMLParser):
@@ -392,6 +393,40 @@ def _should_use_url_default_docs_ingest() -> bool:
     return DEFAULT_DOCS_INGEST_SOURCE == "url" and bool(DEFAULT_DOCS_URL)
 
 
+async def ingest_openrag_docs_when_ready(
+    document_service, task_service, langflow_file_service, session_manager
+):
+    """Ingest OpenRAG docs during onboarding."""
+    use_url_ingest = _should_use_url_default_docs_ingest()
+    if use_url_ingest:
+        try:
+            await TelemetryClient.send_event(
+                Category.DOCUMENT_INGESTION, MessageId.ORB_DOC_DEFAULT_URL_START
+            )
+            if DISABLE_INGEST_WITH_LANGFLOW:
+                await _ingest_default_documents_url(
+                    document_service=document_service,
+                    docs_url=DEFAULT_DOCS_URL,
+                    crawl_depth=DEFAULT_DOCS_CRAWL_DEPTH,
+                )
+            else:
+                await _ingest_default_documents_url_langflow(
+                    langflow_file_service=langflow_file_service,
+                    session_manager=session_manager,
+                    task_service=task_service,
+                    docs_url=DEFAULT_DOCS_URL,
+                    crawl_depth=DEFAULT_DOCS_CRAWL_DEPTH,
+                )
+            await TelemetryClient.send_event(
+                Category.DOCUMENT_INGESTION, MessageId.ORB_DOC_DEFAULT_URL_COMPLETE
+            )
+        except Exception as e:
+            logger.error("Default URL documents ingestion failed", error=str(e))
+            await TelemetryClient.send_event(
+                Category.DOCUMENT_INGESTION, MessageId.ORB_DOC_DEFAULT_URL_FAILED
+            )
+
+
 async def ingest_default_documents_when_ready(
     document_service, task_service, langflow_file_service, session_manager
 ):
@@ -405,17 +440,9 @@ async def ingest_default_documents_when_ready(
         await TelemetryClient.send_event(
             Category.DOCUMENT_INGESTION, MessageId.ORB_DOC_DEFAULT_START
         )
-        use_url_ingest = _should_use_url_default_docs_ingest()
-        if use_url_ingest:
-            await _ingest_default_documents_url(
-                document_service=document_service,
-                docs_url=DEFAULT_DOCS_URL,
-                crawl_depth=DEFAULT_DOCS_CRAWL_DEPTH,
-            )
-            await TelemetryClient.send_event(
-                Category.DOCUMENT_INGESTION, MessageId.ORB_DOC_DEFAULT_COMPLETE
-            )
-            return
+        await ingest_openrag_docs_when_ready(
+            document_service, task_service, langflow_file_service, session_manager
+        )
 
         base_dir = _get_documents_dir()
         if not os.path.isdir(base_dir):
@@ -423,12 +450,16 @@ async def ingest_default_documents_when_ready(
                 f"Default documents directory not found: {base_dir}"
             )
 
-        # Collect files recursively, excluding warmup files
+        excluded_files = set(EXCLUDED_INGESTION_FILES)
+        if _should_use_url_default_docs_ingest():
+            excluded_files.update(URL_INGEST_EXCLUDED_INGESTION_FILES)
+
+        # Collect files recursively, excluding warmup files and URL-ingested docs
         file_paths = [
             os.path.join(root, fn)
             for root, _, files in os.walk(base_dir)
             for fn in files
-            if fn not in EXCLUDED_INGESTION_FILES
+            if fn not in excluded_files
         ]
 
         if not file_paths:
@@ -467,6 +498,7 @@ async def _ingest_default_documents_langflow(
 
     # Use AnonymousUser details for default documents
     from session_manager import AnonymousUser
+
     anonymous_user = AnonymousUser()
 
     # Get JWT token using same logic as DocumentFileProcessor
@@ -516,6 +548,56 @@ async def _ingest_default_documents_langflow(
         "Started Langflow ingestion task for default documents",
         task_id=task_id,
         file_count=len(file_paths),
+    )
+
+
+async def _ingest_default_documents_url_langflow(
+    langflow_file_service,
+    session_manager,
+    task_service,
+    docs_url: str,
+    crawl_depth: int,
+):
+    """Ingest default URL docs using the Langflow URL ingestion pipeline."""
+    if not docs_url:
+        raise ValueError("DEFAULT_DOCS_URL is not configured")
+
+    logger.info(
+        "Using Langflow URL ingestion pipeline for default documents",
+        docs_url=docs_url,
+        crawl_depth=crawl_depth,
+    )
+
+    from models.url import LangflowUrlProcessor
+    from session_manager import AnonymousUser
+
+    anonymous_user = AnonymousUser()
+    effective_jwt = None
+
+    if session_manager:
+        session_manager.get_user_opensearch_client(
+            anonymous_user.user_id, effective_jwt
+        )
+        if hasattr(session_manager, "_anonymous_jwt"):
+            effective_jwt = session_manager._anonymous_jwt
+
+    processor = LangflowUrlProcessor(
+        langflow_file_service=langflow_file_service,
+        session_manager=session_manager,
+        docs_url=docs_url,
+        crawl_depth=crawl_depth,
+        owner_user_id=None,
+        jwt_token=effective_jwt,
+        owner_name=anonymous_user.name,
+        owner_email=anonymous_user.email,
+        connector_type="openrag_docs",
+    )
+    task_id = await task_service.create_custom_task(None, [docs_url], processor)
+
+    logger.info(
+        "Started Langflow URL ingestion task for default documents",
+        task_id=task_id,
+        docs_url=docs_url,
     )
 
 
@@ -616,7 +698,7 @@ async def _materialize_default_docs_url_as_text_file(
     return temp_file.name
 
 
-async def _delete_existing_default_docs(session_manager):
+async def _delete_existing_default_docs(session_manager, connector_type: str):
     """Delete previously ingested default OpenRAG docs before reingestion."""
     from session_manager import AnonymousUser
 
@@ -647,7 +729,7 @@ async def _delete_existing_default_docs(session_manager):
                     {
                         "bool": {
                             "must": [
-                                {"term": {"connector_type": "system_default"}},
+                                {"term": {"connector_type": connector_type}},
                                 {"term": {"owner_email": anonymous_user.email}},
                             ]
                         }
@@ -705,8 +787,8 @@ async def _reingest_default_docs_on_upgrade_if_needed(
         previous_version=previous_version,
         current_version=current_version,
     )
-    await _delete_existing_default_docs(session_manager)
-    await ingest_default_documents_when_ready(
+    await _delete_existing_default_docs(session_manager, connector_type="openrag_docs")
+    await ingest_openrag_docs_when_ready(
         document_service,
         task_service,
         langflow_file_service,
@@ -863,8 +945,8 @@ async def refresh_default_openrag_docs(
             previous_signature=previous_signature,
             new_signature=signature,
         )
-        await _delete_existing_default_docs(session_manager)
-        await ingest_default_documents_when_ready(
+        await _delete_existing_default_docs(session_manager, connector_type="openrag_docs")
+        await ingest_openrag_docs_when_ready(
             document_service,
             task_service,
             langflow_file_service,

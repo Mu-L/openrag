@@ -239,7 +239,7 @@ class LangflowFileService:
         owner: Optional[str] = None,
         owner_name: Optional[str] = None,
         owner_email: Optional[str] = None,
-        connector_type: str = "system_default",
+        connector_type: str = "url",
         prevent_outside: bool = True,
     ) -> Dict[str, Any]:
         """Run URL-based docs ingestion flow using Langflow global variable passthrough."""
@@ -267,12 +267,12 @@ class LangflowFileService:
             "X-Langflow-Global-Var-OWNER_EMAIL": str(owner_email) if owner_email else "",
             "X-Langflow-Global-Var-CONNECTOR_TYPE": str(connector_type),
             "X-Langflow-Global-Var-SELECTED_EMBEDDING_MODEL": str(embedding_model),
-            "X-Langflow-Global-Var-DOCS_URL": str(docs_url),
-            "X-Langflow-Global-Var-DOCS_URLS": json.dumps([docs_url]),
-            "X-Langflow-Global-Var-DOCS_CRAWL_DEPTH": str(crawl_depth),
-            "X-Langflow-Global-Var-DOCS_PREVENT_OUTSIDE": "true"
-            if prevent_outside
-            else "false",
+            #TODO: Uncomment these when the flow is updated to use the new variables
+            # "X-Langflow-Global-Var-DOCS_URL": str(docs_url),
+            # "X-Langflow-Global-Var-DOCS_CRAWL_DEPTH": str(crawl_depth),
+            # "X-Langflow-Global-Var-DOCS_PREVENT_OUTSIDE": "true"
+            # if prevent_outside
+            # else "false",
         }
         add_provider_credentials_to_headers(headers, config)
 
