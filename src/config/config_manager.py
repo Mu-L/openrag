@@ -37,6 +37,7 @@ class WatsonXConfig:
 class OllamaConfig:
     """Ollama provider configuration."""
     endpoint: str = ""
+    resolved_endpoint: str = ""
     configured: bool = False
 
 
