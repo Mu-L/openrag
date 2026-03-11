@@ -818,6 +818,34 @@ class FlowsService:
 
         return None, None
 
+    def _find_nodes_in_flow(self, flow_data, display_name=None):
+        """Find all nodes in flow data by display name."""
+        nodes = flow_data.get("data", {}).get("nodes", [])
+        found = []
+        for i, node in enumerate(nodes):
+            node_data = node.get("data", {})
+            node_template = node_data.get("node", {})
+            if display_name and node_template.get("display_name") == display_name:
+                found.append((node, i))
+        return found
+
+    def _get_node_provider(self, node):
+        """Get the provider name currently set in a node."""
+        template = node.get("data", {}).get("node", {}).get("template", {})
+        model_val = template.get("model", {}).get("value")
+        if isinstance(model_val, list) and len(model_val) > 0:
+            return model_val[0].get("provider")
+        return None
+
+    def _get_provider_name_display(self, provider: str):
+        if provider == "watsonx":
+            return "IBM WatsonX"
+        if provider == "ollama":
+            return "Ollama"
+        if provider == "anthropic":
+            return "Anthropic"
+        return "OpenAI"
+
     async def _update_flow_field(self, flow_id: str, field_name: str, field_value: str, node_display_name: str = None):
         """
         Generic helper function to update any field in any Langflow component.
@@ -1196,12 +1224,71 @@ class FlowsService:
 
         # Update embedding component
         if not DISABLE_INGEST_WITH_LANGFLOW and embedding_model:
-            embedding_node, _ = self._find_node_in_flow(flow_data, display_name=OPENAI_EMBEDDING_COMPONENT_DISPLAY_NAME)
-            if embedding_node:
-                if await self._update_component_fields(
-                    embedding_node, provider, embedding_model
-                ):
-                    updates_made.append(f"embedding model: {embedding_model}")
+            # Get all embedding nodes in the flow
+            embedding_nodes = self._find_nodes_in_flow(flow_data, display_name=OPENAI_EMBEDDING_COMPONENT_DISPLAY_NAME)
+            logger.info(f"Found {len(embedding_nodes)} embedding nodes in flow {flow_name} with display name '{OPENAI_EMBEDDING_COMPONENT_DISPLAY_NAME}'")
+            
+            # Count configured embedding-enabled providers
+            config_obj = get_openrag_config()
+            configured_providers = []
+            if config_obj.providers.openai.configured: configured_providers.append("openai")
+            if config_obj.providers.watsonx.configured: configured_providers.append("watsonx")
+            if config_obj.providers.ollama.configured: configured_providers.append("ollama")
+            
+            # Ensure current provider is in the list for counting purposes if it's being configured
+            if provider in ["openai", "watsonx", "ollama"] and provider not in configured_providers:
+                configured_providers.append(provider)
+            
+            all_possible = ["openai", "watsonx", "ollama"]
+            configured_providers = [p for p in all_possible if p in configured_providers]
+            provider_count = len(configured_providers)
+            logger.info(f"Configured embedding providers: {configured_providers} (count: {provider_count})")
+            
+            # Determine target nodes based on provider count
+            if provider_count == 1:
+                target_count = 3
+            elif provider_count == 2:
+                target_count = 2
+            elif provider_count == 3:
+                target_count = 1
+            else:
+                target_count = 0
+
+            # 1. Check if any node is already this provider - always update those first
+            matched_nodes = []
+            provider_display = self._get_provider_name_display(provider)
+            for node, idx in embedding_nodes:
+                if self._get_node_provider(node) == provider_display:
+                    matched_nodes.append((node, idx))
+            
+            if matched_nodes:
+                logger.info(f"Found {len(matched_nodes)} nodes already configured for provider '{provider}'")
+                for node, idx in matched_nodes:
+                    if await self._update_component_fields(node, provider, embedding_model):
+                        updates_made.append(f"embedding model: {embedding_model} (updated existing {provider} node)")
+            else:
+                # 2. No existing node matched, use the slot-based logic
+                try:
+                    p_index = configured_providers.index(provider)
+                    
+                    if provider_count == 1:
+                        # Set all 3 nodes if only one provider
+                        logger.info(f"Single provider mode: attempt to update up to 3 nodes (available: {len(embedding_nodes)})")
+                        for i in range(min(3, len(embedding_nodes))):
+                            node, idx = embedding_nodes[i]
+                            if await self._update_component_fields(node, provider, embedding_model):
+                                updates_made.append(
+                                    f"embedding model: {embedding_model} (set node {i+1})"
+                                )
+                    elif p_index < target_count and p_index < len(embedding_nodes):
+                        # Set corresponding node based on index
+                        node, idx = embedding_nodes[p_index]
+                        if await self._update_component_fields(node, provider, embedding_model):
+                            updates_made.append(
+                                f"embedding model: {embedding_model} (set node {p_index+1})"
+                            )
+                except ValueError:
+                    pass
 
         # Update LLM component (if exists in this flow)
         if llm_model:
@@ -1290,14 +1377,63 @@ class FlowsService:
     ):
         """Update fields in a component node based on provider and component type"""
         template = component_node.get("data", {}).get("node", {}).get("template", {})
-
         if not template:
             return False
 
         updated = False
+        provider_name = self._get_provider_name_display(provider)
 
-        provider_name = "IBM WatsonX" if provider == "watsonx" else "Ollama" if provider == "ollama" else "Anthropic" if provider == "anthropic" else "OpenAI"
+        # Enable the model in Langflow first
+        await self._enable_model_in_langflow(provider_name, model_value)
 
+        # Update model field and call custom_component/update endpoint
+        if "model" in template:
+            if "options" not in template["model"]:
+                return False
+
+            # Update template via Langflow API to get latest options
+            template = await self._update_component_langflow(template, model_value) or template
+            component_node["data"]["node"]["template"] = template
+
+            # Find the specific model option for the provider
+            model_options = [
+                item for item in template["model"].get("options", [])
+                if item.get("provider") == provider_name and item.get("name") == model_value
+            ]
+
+            if not model_options:
+                logger.warning(f"Model {model_value} not found for provider {provider_name}")
+                return False
+
+            template["model"]["value"] = model_options
+            updated = True
+
+        # Update provider-specific fields
+        field_mappings = {
+            "api_base": {
+                "ollama": "OLLAMA_BASE_URL",
+                "watsonx": "WATSONX_URL"
+            },
+            "project_id": {
+                "watsonx": "WATSONX_PROJECT_ID"
+            }
+        }
+
+        for field, mapping in field_mappings.items():
+            if field in template:
+                target_value = mapping.get(provider)
+                if target_value:
+                    template[field]["value"] = target_value
+                    template[field]["load_from_db"] = True
+                else:
+                    template[field]["value"] = ""
+                    template[field]["load_from_db"] = False
+                updated = True
+
+        return updated
+
+    async def _enable_model_in_langflow(self, provider_name: str, model_value: str):
+        """Ensure the specified model is enabled in Langflow."""
         try:
             enable_payload = [{
                 "provider": provider_name,
@@ -1305,64 +1441,35 @@ class FlowsService:
                 "enabled": True
             }]
             
-            enable_response = await clients.langflow_request(
+            response = await clients.langflow_request(
                 "POST", "/api/v1/models/enabled_models", json=enable_payload
             )
             
-            if enable_response.status_code == 200:
+            if response.status_code == 200:
                 logger.info(f"Successfully enabled model {model_value} for provider {provider_name}")
             else:
                 logger.warning(
-                    f"Failed to enable model: HTTP {enable_response.status_code} - {enable_response.text}"
+                    f"Failed to enable model: HTTP {response.status_code} - {response.text}"
                 )
         except Exception as e:
             logger.error(f"Error enabling model {model_value}: {str(e)}")
-        
-        # Update provider field and call custom_component/update endpoint
-        if "model" in template:
-            if "options" not in template["model"]:
-                return False
 
-            model = [template["model"]["options"][0]]
-
-            template = await self._update_component_langflow(template, model_value)
-
-            component_node["data"]["node"]["template"] = template
-            
-            model = [item for item in template["model"]["options"] if item["provider"] == provider_name and item["name"] == model_value]
-
-            template = await self._update_component_langflow(template, model_value)
-
-            template["model"]["value"] = model
-
-            component_node["data"]["node"]["template"] = template
-
-            if len(model) == 0:
-                logger.warning(f"Model {model_value} not found for provider {provider_name}")
-                return False
-
-            updated = True
-                
-
-        if "api_base" in template:
-            if provider == "ollama":
-                template["api_base"]["value"] = "OLLAMA_BASE_URL"
-                template["api_base"]["load_from_db"] = True
-            elif provider == "watsonx":
-                # Watson uses "url" field
-                template["api_base"]["value"] = "WATSONX_URL"
-                template["api_base"]["load_from_db"] = True
-            else:
-                template["api_base"]["value"] = ""
-                template["api_base"]["load_from_db"] = False
-            updated = True
-
-        if "project_id" in template:
-            if provider == "watsonx":
-                template["project_id"]["value"] = "WATSONX_PROJECT_ID"
-                template["project_id"]["load_from_db"] = True
-            else:
-                template["project_id"]["value"] = ""
-                template["project_id"]["load_from_db"] = False
-            updated = True
-        return updated
+    def _get_provider_component_ids(self, provider: str):
+        """Helper to get component display names for various providers."""
+        from config.settings import (
+            OPENAI_EMBEDDING_COMPONENT_DISPLAY_NAME,
+            OPENAI_LLM_COMPONENT_DISPLAY_NAME,
+            WATSONX_EMBEDDING_COMPONENT_DISPLAY_NAME,
+            WATSONX_LLM_COMPONENT_DISPLAY_NAME,
+            OLLAMA_EMBEDDING_COMPONENT_DISPLAY_NAME,
+            OLLAMA_LLM_COMPONENT_DISPLAY_NAME,
+        )
+        if provider == "openai":
+            return (OPENAI_EMBEDDING_COMPONENT_DISPLAY_NAME, OPENAI_LLM_COMPONENT_DISPLAY_NAME)
+        elif provider == "watsonx":
+            return (WATSONX_EMBEDDING_COMPONENT_DISPLAY_NAME, WATSONX_LLM_COMPONENT_DISPLAY_NAME)
+        elif provider == "ollama":
+            return (OLLAMA_EMBEDDING_COMPONENT_DISPLAY_NAME, OLLAMA_LLM_COMPONENT_DISPLAY_NAME)
+        elif provider == "anthropic":
+            return (None, "Anthropic")
+        return (None, None)
