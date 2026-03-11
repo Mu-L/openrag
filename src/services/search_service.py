@@ -75,10 +75,10 @@ class SearchService:
             if filters:
                 # Map frontend filter names to backend field names
                 field_mapping = {
-                    "data_sources": "filename.keyword",
-                    "document_types": "mimetype.keyword",
+                    "data_sources": "filename",
+                    "document_types": "mimetype",
                     "owners": "owner_name.keyword",
-                    "connector_types": "connector_type.keyword",
+                    "connector_types": "connector_type",
                 }
 
                 for filter_key, values in filters.items():
@@ -234,10 +234,10 @@ class SearchService:
             if filters:
                 # Map frontend filter names to backend field names
                 field_mapping = {
-                    "data_sources": "filename.keyword",
-                    "document_types": "mimetype.keyword",
+                    "data_sources": "filename",
+                    "document_types": "mimetype",
                     "owners": "owner_name.keyword",
-                    "connector_types": "connector_type.keyword",
+                    "connector_types": "connector_type",
                 }
 
                 for filter_key, values in filters.items():
@@ -330,10 +330,10 @@ class SearchService:
         search_body = {
             "query": query_block,
             "aggs": {
-                "data_sources": {"terms": {"field": "filename.keyword", "size": 20}},
-                "document_types": {"terms": {"field": "mimetype.keyword", "size": 10}},
+                "data_sources": {"terms": {"field": "filename", "size": 20}},
+                "document_types": {"terms": {"field": "mimetype", "size": 10}},
                 "owners": {"terms": {"field": "owner_name.keyword", "size": 10}},
-                "connector_types": {"terms": {"field": "connector_type.keyword", "size": 10}},
+                "connector_types": {"terms": {"field": "connector_type", "size": 10}},
                 "embedding_models": {"terms": {"field": "embedding_model", "size": 10}},
             },
             "_source": [
@@ -395,119 +395,17 @@ class SearchService:
 
         search_params = {"terminate_after": 0}
 
-        def is_knn_field_error(message: str) -> bool:
-            lowered = message.lower()
-            # OpenSearch variants seen in practice:
-            # - "Field 'x' is not knn_vector type."
-            # - "failed to create query: Field 'x' ..."
-            # - generic knn query construction errors
-            return (
-                "not knn_vector type" in lowered
-                or "failed to create query: field" in lowered
-                or "knn_vector" in lowered
-                or ("failed to create query" in lowered and "knn" in lowered)
-            )
-
-        def is_fielddata_error(message: str) -> bool:
-            lowered = message.lower()
-            return "text fields are not optimised" in lowered or "fielddata" in lowered
-
-        async def run_keyword_only_fallback(reason: str):
-            logger.warning(
-                "Falling back to keyword-only search",
-                reason=reason,
-            )
-            if not (query or "").strip():
-                # Keep empty-query behavior deterministic in fallback paths.
-                return {"hits": {"hits": []}, "aggregations": {}}
-            keyword_query = {
-                "bool": {
-                    "must": [
-                        {
-                            "multi_match": {
-                                "query": query,
-                                "fields": ["text^2", "filename^1.5"],
-                                "type": "best_fields",
-                                "fuzziness": "AUTO",
-                            }
-                        }
-                    ],
-                    "filter": filter_clauses,
-                }
-            }
-            keyword_search_body = copy.deepcopy(search_body)
-            keyword_search_body["query"] = keyword_query
-            keyword_search_body.pop("min_score", None)
-            try:
-                return await opensearch_client.search(
-                    index=get_index_name(),
-                    body=keyword_search_body,
-                    params=search_params,
-                )
-            except Exception as keyword_error:
-                keyword_error_message = str(keyword_error)
-                if is_fielddata_error(keyword_error_message):
-                    # Some clusters can reject terms aggregations for text-mapped fields;
-                    # retry keyword-only query without aggregations to keep retrieval alive.
-                    keyword_without_aggs = copy.deepcopy(keyword_search_body)
-                    keyword_without_aggs.pop("aggs", None)
-                    return await opensearch_client.search(
-                        index=get_index_name(),
-                        body=keyword_without_aggs,
-                        params=search_params,
-                    )
-                raise
-
-        async def run_legacy_vector_fallback(reason: str, *, include_num_candidates: bool):
-            logger.warning(
-                "Attempting legacy vector fallback",
-                reason=reason,
-                include_num_candidates=include_num_candidates,
-            )
-            fallback_vector = next(iter(query_embeddings.values()), None)
-            if fallback_vector is None:
-                return await run_keyword_only_fallback(
-                    f"{reason}; no query embeddings available"
-                )
-
-            fallback_field = "chunk_embedding"
-            legacy_search_body = copy.deepcopy(search_body)
-            legacy_search_body.pop("min_score", None)
-            legacy_search_body["query"]["bool"]["filter"] = [
-                *filter_clauses,
-                {"exists": {"field": fallback_field}},
-            ]
-
-            knn_legacy = {
-                "knn": {
-                    fallback_field: {
-                        "vector": fallback_vector,
-                        "k": 50,
-                    }
-                }
-            }
-            if include_num_candidates:
-                knn_legacy["knn"][fallback_field]["num_candidates"] = 1000
-            legacy_search_body["query"]["bool"]["should"][0]["dis_max"]["queries"] = [knn_legacy]
-
-            return await opensearch_client.search(
-                index=get_index_name(),
-                body=legacy_search_body,
-                params=search_params,
-            )
-
         try:
             index_name = get_index_name()
             logger.info(f"Sending query to index '{index_name}'..")
             results = await opensearch_client.search(
                 index=index_name, body=search_body, params=search_params
             )
-        except Exception as e:
+        except RequestError as e:
             error_message = str(e)
-            lowered_error = error_message.lower()
             if (
                 fallback_search_body is not None
-                and "unknown field [num_candidates]" in lowered_error
+                and "unknown field [num_candidates]" in error_message.lower()
             ):
                 logger.warning(
                     "OpenSearch cluster does not support num_candidates; retrying without it"
@@ -518,51 +416,24 @@ class SearchService:
                         body=fallback_search_body,
                         params=search_params,
                     )
-                except Exception as retry_error:
-                    retry_error_message = str(retry_error)
-                    if not is_wildcard_match_all:
-                        # Be resilient here: when the retry still fails, prefer degraded retrieval
-                        # over surfacing a hard 500 to callers.
-                        if is_knn_field_error(retry_error_message):
-                            try:
-                                results = await run_legacy_vector_fallback(
-                                    f"knn field error after num_candidates fallback: {retry_error_message}",
-                                    include_num_candidates=False,
-                                )
-                            except Exception as legacy_retry_error:
-                                results = await run_keyword_only_fallback(
-                                    "legacy vector fallback failed after num_candidates fallback: "
-                                    f"{legacy_retry_error}"
-                                )
-                        else:
-                            results = await run_keyword_only_fallback(
-                                f"search failed after num_candidates fallback: {retry_error_message}"
-                            )
-                    else:
-                        logger.error(
-                            "OpenSearch retry without num_candidates failed",
-                            error=retry_error_message,
-                            search_body=fallback_search_body,
-                        )
-                        raise
-            elif (
-                not is_wildcard_match_all
-                and is_knn_field_error(error_message)
-            ):
-                try:
-                    results = await run_legacy_vector_fallback(
-                        f"knn field error: {error_message}",
-                        include_num_candidates=False,
+                except RequestError as retry_error:
+                    logger.error(
+                        "OpenSearch retry without num_candidates failed",
+                        error=str(retry_error),
+                        search_body=fallback_search_body,
                     )
-                except Exception as legacy_error:
-                    results = await run_keyword_only_fallback(
-                        f"legacy vector fallback failed: {legacy_error}"
-                    )
+                    raise
             else:
                 logger.error(
                     "OpenSearch query failed", error=error_message, search_body=search_body
                 )
                 raise
+        except Exception as e:
+            logger.error(
+                "OpenSearch query failed", error=str(e), search_body=search_body
+            )
+            # Re-raise the exception so the API returns the error to frontend
+            raise
 
         # Transform results (keep for backward compatibility)
         chunks = []
