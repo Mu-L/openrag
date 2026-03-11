@@ -1279,7 +1279,7 @@ async def _create_openrag_docs_filter(
         "filters": {
             # URL-based docs ingestion produces many source URLs.
             # Filter by connector type to target OpenRAG docs only.
-            "data_sources": ["*"],
+            "data_sources": ["https://www.openr.ag/"],
             "document_types": ["*"],
             "owners": ["*"],
             "connector_types": ["openrag_docs"],
