@@ -8,8 +8,9 @@ logger = get_logger(__name__)
 
 
 class LangflowFileService:
-    def __init__(self):
+    def __init__(self, flows_service=None):
         self.flow_id_ingest = LANGFLOW_INGEST_FLOW_ID
+        self.flows_service = flows_service
 
     async def upload_user_file(
         self, file_tuple, jwt_token: Optional[str] = None
@@ -161,7 +162,7 @@ class LangflowFileService:
             )
         
         # Add provider credentials as global variables for ingestion
-        add_provider_credentials_to_headers(headers, config)
+        await add_provider_credentials_to_headers(headers, config, flows_service=self.flows_service)
         logger.info(f"[LF] Headers {headers}")
         logger.info(f"[LF] Payload {payload}")
         resp = await clients.langflow_request(
