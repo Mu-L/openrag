@@ -61,7 +61,7 @@ class LangflowFileService:
         self,
         file_paths: List[str],
         file_tuples: list[tuple[str, str, str]],
-        jwt_token: str,
+        jwt_token: Optional[str] = None,
         session_id: Optional[str] = None,
         runtime_vars: Optional[Dict[str, Any]] = None,
         owner: Optional[str] = None,
@@ -160,7 +160,28 @@ class LangflowFileService:
                 reason=resp.reason_phrase,
                 body=resp.text[:1000],
             )
-        resp.raise_for_status()
+            
+            # Extract error message from Langflow response
+            error_message = f"Server error '{resp.status_code} {resp.reason_phrase}'"
+            try:
+                error_data = resp.json()
+                if isinstance(error_data, dict) and "detail" in error_data:
+                    detail = error_data["detail"]
+                    if isinstance(detail, str):
+                        try:
+                            detail_obj = json.loads(detail)
+                            if isinstance(detail_obj, dict) and "message" in detail_obj:
+                                error_message = detail_obj["message"]
+                            else:
+                                error_message = detail
+                        except json.JSONDecodeError:
+                            error_message = detail
+                    elif isinstance(detail, dict) and "message" in detail:
+                        error_message = detail["message"]
+            except Exception:
+                pass
+            
+            raise Exception(error_message)
         
         # Check if response is actually JSON before parsing
         content_type = resp.headers.get("content-type", "")
@@ -280,8 +301,7 @@ class LangflowFileService:
                 "[LF] Ingestion failed during combined operation",
                 extra={"error": str(e), "file_path": file_path},
             )
-            # Note: We could optionally delete the uploaded file here if ingestion fails
-            raise Exception(f"Ingestion failed: {str(e)}")
+            raise
 
         # Step 4: Delete file from Langflow (optional)
         file_id = upload_result.get("id")

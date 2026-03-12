@@ -1,3 +1,4 @@
+from utils.version_utils import OPENRAG_VERSION
 import asyncio
 import atexit
 import os
@@ -77,7 +78,6 @@ logger = get_logger(__name__)
 
 # Files to exclude from startup ingestion
 EXCLUDED_INGESTION_FILES = {"warmup_ocr.pdf"}
-
 
 async def wait_for_opensearch():
     """Wait for OpenSearch to be ready, delegating to the shared utility."""
@@ -346,15 +346,17 @@ async def ingest_default_documents_when_ready(
             raise FileNotFoundError(f"No default documents found in {base_dir}")
 
         if DISABLE_INGEST_WITH_LANGFLOW:
-            await _ingest_default_documents_openrag(
+            task_id = await _ingest_default_documents_openrag(
                 document_service, task_service, file_paths
             )
         else:
-            await _ingest_default_documents_langflow(
+            task_id = await _ingest_default_documents_langflow(
                 langflow_file_service, session_manager, task_service, file_paths
             )
 
         await TelemetryClient.send_event(Category.DOCUMENT_INGESTION, MessageId.ORB_DOC_DEFAULT_COMPLETE)
+
+        return task_id
 
     except Exception as e:
         logger.error("Default documents ingestion failed", error=str(e))
@@ -415,6 +417,8 @@ async def _ingest_default_documents_langflow(
         file_count=len(file_paths),
     )
 
+    return task_id
+
 async def health_check(request: Request):
     """Simple liveness probe: Indicates that the OpenRAG Backend service is online and running."""
     return JSONResponse({"status": "ok"}, status_code=200)
@@ -468,6 +472,8 @@ async def _ingest_default_documents_openrag(
         task_id=task_id,
         file_count=len(file_paths),
     )
+
+    return task_id
 
 
 async def _update_mcp_servers_with_provider_credentials(services):
@@ -691,7 +697,7 @@ async def create_app():
     """Create and configure the FastAPI application"""
     services = await initialize_services()
 
-    app = FastAPI(title="OpenRAG API", version="0.2.4", debug=True)
+    app = FastAPI(title="OpenRAG API", version=OPENRAG_VERSION, debug=True)
     app.state.services = services  # Store services for cleanup
     app.state.background_tasks = set()
 
