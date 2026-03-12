@@ -19,6 +19,7 @@ export const SelectedKnowledgeFilter = ({
       className={`inline-flex items-center p-1 rounded-sm text-xs font-medium transition-colors ${
         filterAccentClasses[parsedFilterData?.color || "zinc"]
       }`}
+      data-testid={`selected-knowledge-filter`}
     >
       {selectedFilter.name}
       <button

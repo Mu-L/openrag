@@ -363,6 +363,7 @@ export function Navigation({
               <button
                 type="button"
                 className="p-1 hover:bg-accent rounded"
+                data-testid="new-conversation-button"
                 onClick={handleNewConversation}
                 title="Start new conversation"
                 disabled={loading}
@@ -460,6 +461,7 @@ export function Navigation({
                       {conversations.map((conversation) => (
                         <button
                           key={conversation.response_id}
+                          data-testid={`conversation-button-${conversation.title}`}
                           type="button"
                           className={`w-full px-3 h-11 rounded-lg group relative text-left ${
                             loading || isConversationsLoading
