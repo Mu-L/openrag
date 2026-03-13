@@ -92,7 +92,7 @@ async def delete_documents_by_filename_core(
                 "error": (
                     "Access denied: insufficient permissions"
                     if status_code == 403
-                    else error_str
+                    else "An internal error has occurred while deleting documents"
                 ),
             },
             status_code,
