@@ -30,7 +30,7 @@ Users can upload, process, and query documents through a chat interface backed b
 
 Check out the [documentation](https://docs.openr.ag/) or get started with the [quickstart](https://docs.openr.ag/quickstart).
 
-Built with [Starlette](https://github.com/Kludex/starlette) and [Next.js](https://github.com/vercel/next.js).
+Built with [FastAPI](https://fastapi.tiangolo.com/) and [Next.js](https://github.com/vercel/next.js). 
 Powered by [OpenSearch](https://github.com/opensearch-project/OpenSearch), [Langflow](https://github.com/langflow-ai/langflow), and [Docling](https://github.com/docling-project/docling).
 
 ---
