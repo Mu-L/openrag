@@ -108,15 +108,18 @@ async def auth_logout(
     auth_service=Depends(get_auth_service),
     user: User = Depends(get_current_user),
 ):
-    """Logout user by clearing auth cookie"""
+    """Logout user by clearing auth cookie(s)"""
+    from config.settings import IBM_AUTH_ENABLED, IBM_SESSION_COOKIE_NAME
+
     await TelemetryClient.send_event(Category.AUTHENTICATION, MessageId.ORB_AUTH_LOGOUT)
     response = JSONResponse(
         {"status": "logged_out", "message": "Successfully logged out"}
     )
 
-    # Clear the auth cookie
-    response.delete_cookie(
-        key="auth_token", httponly=True, secure=False, samesite="lax"
-    )
+    if IBM_AUTH_ENABLED:
+        response.delete_cookie(key=IBM_SESSION_COOKIE_NAME, httponly=True, samesite="lax")
+        response.delete_cookie(key="ibm-auth-basic", httponly=True, samesite="lax")
+    else:
+        response.delete_cookie(key="auth_token", httponly=True, secure=False, samesite="lax")
 
     return response
