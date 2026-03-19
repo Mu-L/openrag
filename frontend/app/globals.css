@@ -29,15 +29,12 @@
     --input: 240 6% 90%;
     --ring: 0 0% 0%;
     --placeholder-foreground: 240 5% 65%;
-    --placeholder: 0 0% 44%; /* #6F6F6F */
 
     /* App-level UI tokens (safe defaults, override per brand/theme) */
     --layered-select-bg: hsl(var(--muted) / 0.5);
     --chat-surface-gradient: rgba(69, 137, 255, 0.16);
     --chat-input-border: hsl(var(--input));
     --icon-disabled: #71717a;
-    --icon-primary: #f4f4f4;
-    --icon-secondary: #c6c6c6;
 
     --accent-amber: 48 96% 89%; /* amber-100 #fef3c7 */
     --accent-amber-foreground: 26 90% 37%; /* amber-700 #b45309 */
@@ -161,6 +158,9 @@
     --placeholder-foreground: var(
       --input
     ); /* placeholder uses shadcn input token */
+    --icon-secondary: 0 0% 32%; /* #525252 */
+    --icon-primary: 0 0% 9%; /* #161616 */
+    --placeholder: 0 0% 66%; /* #a8a8a8 */
 
     --accent-amber: 39 100% 88%;
     --accent-amber-foreground: 26 90% 37%;
@@ -279,6 +279,10 @@
     --layered-select-bg: rgba(131, 131, 131, 0.24);
     --chat-input-border: #262626;
     --icon-disabled: #525252;
+    --icon-secondary: 0 0% 78%; /* #c6c6c6*/
+    --icon-primary: 0 0% 96%; /* #f4f4f4*/
+    --placeholder: 0 0% 44%; /* #6F6F6F */
+
     --layer-contextual: 0 0% 15%;
     --layer-contextual-foreground: 0 0% 95.7%;
     --text-text-01: 0 0% 95.7%;
@@ -310,6 +314,16 @@
     line-height: 36px !important;
     font-style: normal;
     letter-spacing: 0;
+  }
+
+  [data-theme="ibm"] .ibm-body-compact {
+    color: hsl(var(--text-text-01));
+    font-family: inherit;
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    line-height: 18px !important;
+    font-style: normal;
+    letter-spacing: 0.16px;
   }
 
   /* IBM Settings: inline links (Link/link-primary) */

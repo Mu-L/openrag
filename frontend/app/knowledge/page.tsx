@@ -601,7 +601,7 @@ function SearchPage() {
               isCloudBrand && "ibm-section-title",
             )}
           >
-            Project Knowledge
+            Project knowledge
           </h2>
         </div>
         {isCloudBrand ? (
@@ -696,7 +696,6 @@ function SearchPage() {
             </div>
           </div>
         )}
-
         <AgGridReact
           className="w-full overflow-auto"
           columnDefs={columnDefs as ColDef<File>[]}

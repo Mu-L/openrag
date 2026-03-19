@@ -1,4 +1,4 @@
-import { ChevronDown, RefreshCw, RotateCcw, Search, X } from "lucide-react";
+import { ArrowRight, RefreshCw, Search, X } from "lucide-react";
 import {
   type ChangeEvent,
   type FormEvent,
@@ -11,19 +11,10 @@ import { useSyncAllConnectors } from "@/app/api/mutations/useSyncConnector";
 import { Button } from "@/components/ui/button";
 import { useKnowledgeFilter } from "@/contexts/knowledge-filter-context";
 import { cn } from "@/lib/utils";
+import { KnowledgeDropdown } from "./knowledge-dropdown";
 import { filterAccentClasses } from "./knowledge-filter-panel";
 
-type KnowledgeSearchBarProps = {
-  onAddKnowledge?: () => void;
-  onAddKnowledgeMenuClick?: () => void;
-  className?: string;
-};
-
-export const KnowledgeSearchBar = ({
-  onAddKnowledge,
-  onAddKnowledgeMenuClick,
-  className,
-}: KnowledgeSearchBarProps) => {
+export const KnowledgeSearchBar = () => {
   const {
     selectedFilter,
     setSelectedFilter,
@@ -56,7 +47,7 @@ export const KnowledgeSearchBar = ({
   return (
     <form
       onSubmit={handleSearch}
-      className={cn("relative flex w-full items-stretch", className)}
+      className={"relative flex w-full items-stretch"}
     >
       {!!selectedFilter?.name && (
         <div
@@ -86,7 +77,7 @@ export const KnowledgeSearchBar = ({
           />
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center">
+        <div className="group/input flex min-w-0 flex-1 items-center">
           <input
             id="search-query"
             name="search-query"
@@ -96,18 +87,25 @@ export const KnowledgeSearchBar = ({
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
               setSearchQueryInput(e.target.value)
             }
-            className="h-full w-full bg-transparent text-sm text-[hsl(var(--placeholder))] placeholder:text-[hsl(var(--placeholder))]"
+            className="h-full w-full bg-transparent text-sm text-[hsl(var(--placeholder))] placeholder:text-[hsl(var(--placeholder))] focus:outline-none focus:ring-0"
           />
-          {searchQueryInput && (
+          {queryOverride && (
             <button
               type="button"
               aria-label="Clear search"
               onClick={handleReset}
-              className="mr-2 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>
           )}
+          <Button
+            variant="ghost"
+            className="h-auto rounded-none hover:bg-accent hover:text-foreground p-2 hidden group-focus-within/input:block"
+            type="submit"
+          >
+            <ArrowRight className="h-4 w-4 text-[var(--icon-primary)]" />
+          </Button>
         </div>
         <Button
           type="button"
@@ -146,25 +144,9 @@ export const KnowledgeSearchBar = ({
         >
           <RefreshCw className="h-4 w-4 m-4 text-[var(--icon-primary)]" />
         </Button>
-
-        <Button
-          type="button"
-          onClick={onAddKnowledge}
-          className="h-auto rounded-none border-l border-border bg-blue-600 px-6 text-base font-medium text-white hover:bg-blue-700"
-        >
-          Add knowledge
-        </Button>
-
-        <Button
-          type="button"
-          variant="default"
-          size="icon"
-          onClick={onAddKnowledgeMenuClick}
-          className="h-auto w-16 flex-shrink-0 rounded-none border-l border-blue-500 bg-blue-600 text-white hover:bg-blue-700"
-          aria-label="Open add knowledge menu"
-        >
-          <ChevronDown className="h-5 w-5" />
-        </Button>
+        <div className="ml-auto">
+          <KnowledgeDropdown />
+        </div>
       </div>
     </form>
   );
