@@ -10,7 +10,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { IBM_Plex_Sans } from "next/font/google";
-
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -74,7 +73,6 @@ const ibmSettingsFont = IBM_Plex_Sans({
 
 function KnowledgeSourcesPage() {
   const isCloudBrand = useIsCloudBrand();
-
   const { isAuthenticated, isNoAuthMode } = useAuth();
   const { addTask, tasks } = useTask();
   const searchParams = useSearchParams();

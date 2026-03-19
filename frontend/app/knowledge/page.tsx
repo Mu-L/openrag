@@ -684,7 +684,7 @@ function SearchPage() {
             {selectedRows.length > 0 && (
               <Button
                 type="button"
-                variant="outline"
+                variant="destructive"
                 className="rounded-lg flex-shrink-0"
                 onClick={() => setShowBulkDeleteDialog(true)}
               >
