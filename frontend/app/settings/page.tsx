@@ -55,6 +55,7 @@ import {
   DEFAULT_KNOWLEDGE_SETTINGS,
   UI_CONSTANTS,
 } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import { useUpdateSettingsMutation } from "../api/mutations/useUpdateSettingsMutation";
 import { ModelSelector } from "../onboarding/_components/model-selector";
 import ConnectorCards from "./_components/connector-cards";
