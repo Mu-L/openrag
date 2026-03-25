@@ -122,9 +122,14 @@ async def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
         claims = ibm_auth.decode_ibm_jwt(ibm_token)
         if claims is not None:
             logger.debug("[IBM Auth] IBM JWT claims decoded successfully")
-            user_id = claims.get("uid") or claims["sub"]
-            email = claims.get("username", claims["sub"])
-            name = claims.get("display_name", claims.get("username", claims["sub"]))
+            sub = claims.get("sub")
+            if not sub:
+                logger.warning("IBM JWT is missing required 'sub' claim; treating as unauthenticated")
+            else:
+                user_id = claims.get("uid") or sub
+                email = claims.get("username", sub)
+                name = claims.get("display_name", claims.get("username", sub))
+
 
     if lh_credentials and lh_credentials.strip() != "":
         logger.debug("[IBM Auth] IBM LH credentials found in request headers")
