@@ -49,7 +49,7 @@ define test_jwt_opensearch
 	TEST_TOKEN=$$(uv run python -c 'from utils.logging_config import configure_logging; configure_logging(log_level="CRITICAL"); \
 	    from src.session_manager import SessionManager, AnonymousUser; \
 	    sm = SessionManager("test"); \
-	    print(sm.create_jwt_token(AnonymousUser()))' 2>/dev/null); \
+	    print(sm.create_jwt_token(AnonymousUser()).removeprefix("Bearer "))' 2>/dev/null); \
 	if [ -z "$$TEST_TOKEN" ]; then \
 	    echo "$(RED)Failed to generate JWT token$(NC)"; \
 	    exit 1; \
@@ -322,6 +322,7 @@ help_utils: ## Show utility commands
 
 ensure-langflow-data: ## Create the langflow-data directory if it does not exist
 	@mkdir -p langflow-data
+	@chmod 777 langflow-data
 
 dev: ensure-langflow-data ## Start full stack with GPU support
 	@echo "$(YELLOW)Starting OpenRAG with GPU support...$(NC)"
@@ -982,6 +983,7 @@ status: ## Show container status
 
 health: ## Check health of all services
 	@echo "$(PURPLE)Health check:$(NC)"
+	@echo "$(CYAN)Frontend:$(NC)   $$(curl -s http://localhost:3000/health 2>/dev/null || echo '$(RED)Not responding$(NC)')"
 	@echo "$(CYAN)Backend:$(NC)    $$(curl -s http://localhost:8000/health 2>/dev/null || echo '$(RED)Not responding$(NC)')"
 	@echo "$(CYAN)Langflow:$(NC)   $$(curl -s http://localhost:7860/health 2>/dev/null || echo '$(RED)Not responding$(NC)')"
 	@echo "$(CYAN)OpenSearch:$(NC) $$(curl -s -k -u admin:$${OPENSEARCH_PASSWORD} https://localhost:9200 2>/dev/null | jq -r .tagline 2>/dev/null || echo '$(RED)Not responding$(NC)')"
