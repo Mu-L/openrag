@@ -147,12 +147,15 @@ function AuthCallbackContent() {
             await refreshAuth();
 
             const redirectTo =
-              stateReturnUrl || searchParams.get("redirect") || "/chat";
+              localStorage.getItem("auth_redirect_to") ||
+              searchParams.get("redirect") ||
+              "/chat";
 
             // Clean up localStorage
             localStorage.removeItem("connecting_connector_id");
             localStorage.removeItem("connecting_connector_type");
             localStorage.removeItem("auth_purpose");
+            localStorage.removeItem("auth_redirect_to");
 
             // Redirect to the original page or home
             setTimeout(() => {
@@ -183,6 +186,7 @@ function AuthCallbackContent() {
         localStorage.removeItem("connecting_connector_id");
         localStorage.removeItem("connecting_connector_type");
         localStorage.removeItem("auth_purpose");
+        localStorage.removeItem("auth_redirect_to");
       }
     };
 

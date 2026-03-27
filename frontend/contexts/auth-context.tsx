@@ -140,6 +140,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           localStorage.setItem("auth_purpose", "app_auth");
           localStorage.setItem("connecting_connector_id", result.connection_id);
           localStorage.setItem("connecting_connector_type", "app_auth");
+          localStorage.setItem("auth_redirect_to", window.location.pathname);
 
           console.log("Stored localStorage items:", {
             auth_purpose: localStorage.getItem("auth_purpose"),
