@@ -48,7 +48,9 @@ export function Header() {
           {/* Discord Link */}
           {/* <DiscordLink inviteCode="EqksyE2EX9" /> */}
 
-          <BrandSwitcher />
+          {process.env.NEXT_PUBLIC_IBM_THEME_DEV === "true" && (
+            <BrandSwitcher />
+          )}
 
           {/* Separator */}
           <div className="w-px h-6 bg-border mx-3" />
