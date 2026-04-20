@@ -1488,7 +1488,7 @@ async def _update_langflow_model_values(config, flows_service, llm_model=None, l
 
         if llm_model or llm_provider:
             effective_llm_provider = (llm_provider or config.agent.llm_provider).lower()
-            if llm_provider and  llm_provider.lower() != config.agent.llm_provider.lower():
+            if llm_provider and llm_provider.lower() != config.agent.llm_provider.lower():
                 effective_llm_model = llm_model  # do not fall back; force caller to specify
             else:
                 effective_llm_model = llm_model or config.agent.llm_model
