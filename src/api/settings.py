@@ -1501,10 +1501,13 @@ async def _update_langflow_model_values(config, flows_service, llm_model=None, l
             )
 
         if not llm_model and not llm_provider:
-            if embedding_provider and embedding_model:
+            if embedding_provider or embedding_model:
+                # Use config fallback when one param is missing
+                effective_provider = embedding_provider or config.knowledge.embedding_provider.lower()
+                effective_model = embedding_model or config.knowledge.embedding_model
                 result = await flows_service.change_langflow_model_value(
-                    embedding_provider,
-                    embedding_model=embedding_model,
+                    effective_provider,
+                    embedding_model=effective_model,
                     force_embedding_update=True
                 )
 
